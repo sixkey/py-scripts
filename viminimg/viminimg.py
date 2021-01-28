@@ -1,4 +1,4 @@
-from typing import Callable, List, Set, Tuple, Any, Optional, Dict
+from typing import Callable, List, Tuple, Any, Optional, Dict
 
 import os
 import sys
@@ -25,11 +25,13 @@ def transform_path(file: str) -> str:
 def transform_path_filename(path: str,
                             transformer: Callable[[
                                 str, int], str] = lambda x, i: x,
-                            index: int = 0) -> str:
+                            index: int = 0,
+                            extension: Optional[str] = None) -> str:
     filename = os.path.basename(path)
-    name, extension = os.path.splitext(path)
+    name, ext = os.path.splitext(path)
     name = name.split("\\")[-1]
-    return path[:-len(filename)] + transformer(name, index) + extension
+    return path[:-len(filename)] + transformer(name, index) + \
+        (extension if extension is not None else ext)
 
 
 def change_extension(path: str, new_extension: str) -> str:
@@ -40,35 +42,65 @@ def change_extension(path: str, new_extension: str) -> str:
 # IMAGE EDITING
 
 def create_open_file():
-    def open_file(original_picture, picture, file_name, original_file_name, index):
+    def open_file(original_picture, picture, file_name, original_file_name,
+                  index):
         picture = Image.open(file_name)
         original_picture = picture
+        log(f"Opening {file_name}")
         return original_picture, picture, file_name, original_file_name, index
     return open_file
 
 
 def create_rollback():
-    def rollback(original_picture, picture, file_name, original_file_name, index):
-        return original_picture, original_picture, original_file_name, original_file_name, index
+    def rollback(original_picture, picture, file_name, original_file_name,
+                 index):
+        log(f"Rolling back to {original_file_name}")
+        return (original_picture, original_picture, original_file_name,
+                original_file_name, index)
     return rollback
 
 
 def create_rename(transformer: Callable[[str, int], str] = lambda x, y: x):
-    def create(original_picture, picture, file_name, original_file_name, index):
-        return original_picture, picture, transformer(file_name, index), original_file_name, index
-    return create
+    def rename(original_picture, picture, file_name, original_file_name,
+               index):
+        log(f"Renaming to {transformer(file_name, index)}")
+        return (original_picture, picture, transformer(file_name, index),
+                original_file_name, index)
+    return rename
 
 
-def create_rename_from_org(transformer: Callable[[str, int], str] = lambda x, y: x):
-    def create(original_picture, picture, file_name, original_file_name, index):
-        return original_picture, picture, transformer(original_file_name, index), original_file_name, index
-    return create
+def create_image_anchor():
+    def rename(original_picture, picture, file_name, original_file_name,
+               index):
+
+        return (picture, picture, file_name, original_file_name, index)
+    return rename
+
+
+def create_name_anchor(transformer: Callable[[str, int], str] = lambda x, y: x):
+    def rename(original_picture, picture, file_name, original_file_name,
+               index):
+        return (original_picture, picture, file_name, file_name, index)
+    return rename
+
+
+def create_rename_from_org(
+        transformer: Callable[[str, int], str] = lambda x, y: x):
+    def rename_from_org(original_picture, picture, file_name,
+                        original_file_name, index):
+        log(f"Renaming to {transformer(original_file_name, index)}")
+        return (original_picture, picture,
+                transformer(original_file_name, index),
+                original_file_name, index)
+    return rename_from_org
 
 
 def create_rescale(max_size: int, height: bool = False):
-    def rescale(original_picture, picture, file_name, original_file_name, index):
+    def rescale(original_picture, picture, file_name, original_file_name,
+                index):
         ratio = max_size / \
             picture.size[0] if not height else max_size / picture.size[1]
+        log(f"Rescaling {file_name} to {max_size}")
         picture = picture.resize((int(picture.size[0] * ratio),
                                   int(picture.size[1] * ratio)),
                                  Image.ANTIALIAS)
@@ -79,26 +111,60 @@ def create_rescale(max_size: int, height: bool = False):
 def create_save(quality: Optional[int] = None):
     def save(original_picture, picture, file_name, original_file_name, index):
         if quality is None:
+            log(f"Saving {file_name}")
             picture.save(file_name)
         else:
+            log(f"Saving {file_name} compressed to quality {quality}")
             picture.save(file_name, optimize=True, quality=quality)
         return original_picture, picture, file_name, original_file_name, index
+
     return save
 
 
-def create_convert():
-    def convert(original_picture, picture, file_name, original_file_name, index):
-        picture = picture.convert('RGB')
+def create_convert(mode):
+    def convert(original_picture, picture, file_name, original_file_name,
+                index):
+        log(f"Converting {file_name} to mode {mode}")
+        if picture.mode.lower() != mode.lower():
+            picture = picture.convert(mode)
         return original_picture, picture, file_name, original_file_name, index
     return convert
 
 
+def create_paste_to_bg(mode, color):
+    def paste_to_bg(original_picture, picture, file_name, original_file_name,
+                    index):
+        log(f"Pasting {file_name} to bg in mode {mode} with color {color}")
+        picture.load()
+        background = Image.new(mode, picture.size, color)
+        background.paste(picture, mask=picture.split()[3])
+        picture = background
+        return original_picture, picture, file_name, original_file_name, index
+    return paste_to_bg
+
+
+def create_condition(con, bricks):
+
+    body = build_transformer(bricks)
+    def condition(original_picture, picture, file_name, original_file_name,
+                  index):
+        if con(original_picture, picture, file_name, original_file_name,
+               index):
+            return body(original_picture, picture, file_name,
+                        original_file_name, index)
+        return original_picture, picture, file_name, original_file_name, index
+    return condition
+
+
 def build_transformer(bricks):
-    def transformer(original_picture, picture, file_name, original_file_name, index):
+    def transformer(original_picture, picture, file_name, original_file_name,
+                    index):
         for brick in bricks:
             result = brick(
-                original_picture, picture, file_name, original_file_name, index)
-            original_picture, picture, file_name, original_file_name, index = result
+                original_picture, picture, file_name,
+                original_file_name, index)
+            (original_picture, picture, file_name,
+             original_file_name, index) = result
         return original_picture, picture, file_name, original_file_name, index
     return transformer
 
@@ -106,7 +172,8 @@ def build_transformer(bricks):
 def build_file_transformer(bricks, res_image, res_files):
     transformer = build_transformer(bricks)
 
-    def file_transformer(original_picture, picture, file_name, original_file_name, index):
+    def file_transformer(original_picture, picture, file_name,
+                         original_file_name, index):
         transformer(original_picture, picture,
                     file_name, original_file_name, index)
         return res_image, res_files
@@ -125,7 +192,7 @@ def create_folder(folder: str) -> None:
         print("Folder already exists")
 
 
-def add_tuples(xs: Tuple[Any, ...], ys: Tuple[Any, ...]) -> Tuple[Any, ...]:
+def add_tuples(xs: Tuple[int, ...], ys: Tuple[int, ...]) -> Tuple[int, ...]:
     res = []
     for x, y in zip(xs, ys):
         res.append(x + y)
@@ -193,7 +260,7 @@ def folder_annotation(metadata: List[FolderMetadata]) -> Any:
 
     root = None
     for key in nodes:
-        if nodes[key].parent == None:
+        if nodes[key].parent is None:
             root = nodes[key]
             break
 
@@ -241,13 +308,91 @@ def dir_path(string):
         raise NotADirectoryError(string)
 
 
+def create_renamer(transformer, mode):
+    def mode_appender(x, i):
+        return transformer(x, i) + '-' + mode
+
+    def renamer(x, i):
+        return transform_path_filename(x, mode_appender, i)
+    return renamer
+
+
+def build_mode(mode: str, args, name_transform):
+
+    base = [
+        create_rollback(),
+        create_rename(lambda x, i: transform_path(x)),
+    ]
+
+    # ADD ORIGINAL
+
+    actions = {
+        "s": [
+            create_rescale(args.scale, args.maxheight),
+        ]
+    }
+
+    current_mode = base[:]
+
+    renamer = create_renamer(name_transform, mode)
+    current_mode.append(create_rename(renamer))
+
+    compression = False
+
+    for letter in mode:
+        if letter == "n":
+            continue
+        elif letter == "c":
+            compression = True
+            continue
+        current_mode += actions[letter]
+
+    if compression:
+        current_mode.append(create_save(args.compression_quality))
+    else:
+        current_mode.append(create_save())
+
+    return current_mode
+
+
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="")
-    parser.add_argument('-i', '--indexed', action='store_const', const=True)
-    parser.add_argument('--resfolder')
-    parser.add_argument('--verbose', action='store_const', const=True)
-    parser.add_argument('orgfolder', type=dir_path)
+    parser = argparse.ArgumentParser(
+        description="Execute commands on folder of images")
+    parser.add_argument(
+        '--resfolder', help="The result folder. It will be deleted at " +
+        "the start!. If not set the folder will be the <original>_viminimg.")
+    parser.add_argument(
+        '--maxheight', action='store_const', const=True,
+        help="If set, scaling will be in regards to height.")
+    parser.add_argument(
+        '-s', '--scale', type=int, help="The max width (if --maxheight " +
+        "present max height)")
+    parser.add_argument(
+        '-c', '--compression_quality', type=int, help="The quality of the " +
+        "final save if compressing.")
+    parser.add_argument(
+        '-m', '--modes', help="Modes n - do nothing, c - compress, s - " +
+        "scale. To separate different modes use _. Example: n_s_sc -> " +
+        "save original picture and save scaled picture and save scaled " +
+        "and compressed picture")
+    renaming_group = parser.add_mutually_exclusive_group()
+    renaming_group.add_argument(
+        '-r', '--rename', help="Format for renaming. $ is the variable " +
+        "for index example: img$ -> img0.jpg, img1.jpg, img2.jpg")
+    renaming_group.add_argument(
+        '-i', '--indexed', action='store_const', const=True, help="Will " +
+        "rename images to <index in folder>.<extension>")
+
+    parser.add_argument('--verbose', action='store_const', const=True,
+                        help="If set, application will log all the actions.")
+    parser.add_argument('orgfolder', type=dir_path, help="The path to the " +
+                        "folder.")
+    parser.add_argument('--metadata', action="store_const", const=True,
+                        help="If set, application will produce metadata json")
+    parser.add_argument('--jpeg', action="store_const", const=True,
+                        help="If set, application will convert everything " +
+                        "to jpg")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -265,35 +410,51 @@ if __name__ == "__main__":
     if not args.verbose:
         log = log_mute
 
-    transformer = build_file_transformer([
-        create_open_file(),
+    bricks = [create_open_file()]
 
-        create_rename_from_org(lambda x, i: transform_path(x)),
-        create_rename(lambda x, i: transform_path_filename(
-            x, lambda x, i: str(i), i)),
-        create_save(),
+    if args.jpeg:
+        bricks += [
+            # create_convert("RGB"),
+            create_condition(lambda o, image, n, on, i: image.mode == 'RGBA', [
+                create_paste_to_bg("RGB", (255, 255, 255))
+            ]),
+            create_rename(lambda x, i:
+                          transform_path_filename(
+                              x, lambda x, i: x, i, ".jpg")),
+            create_name_anchor(),
+            create_image_anchor()
+        ]
 
-        create_rename_from_org(lambda x, i: transform_path(x)),
-        create_rename(lambda x, i: transform_path_filename(
-            x, lambda x, i: str(i) + "-s", i)),
-        create_rescale(600),
-        create_save(),
+    res_files = 0
 
-        create_rename_from_org(lambda x, i: transform_path(x)),
-        create_rename(lambda x, i: transform_path_filename(
-            x, lambda x, i: str(i) + "-c", i)),
-        create_save(10),
+    if not args.rename:
+        def name_transform(
+            x, i): return x if not args.indexed else str(i)
+    else:
+        def name_transform(x, i):
+            return args.rename.replace("$", str(i))
 
-    ], 1, 1)
+    transformers = []
+
+    namings = []
+
+    for mode in args.modes.split("_"):
+        bricks += build_mode(mode, args, name_transform)
+
+    print("\n".join([x.__name__ for x in bricks]))
+
+    transformer = build_file_transformer(bricks, 1, res_files)
 
     metadata_container = []
     compress_folder(ORG_PATH, metadata_container, transformer)
-    annotation = folder_annotation(metadata_container)
 
-    metadata = {
-        'folders': metadata_container,
-        'tree': annotation
-    }
+    if args.metadata:
+        annotation = folder_annotation(metadata_container)
 
-    with open(metadata_path, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, ensure_ascii=False)
+        metadata = {
+            'folders': metadata_container,
+            'tree': annotation
+        }
+
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False)
