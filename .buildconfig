@@ -1,0 +1,12 @@
+{
+    "viminimg": [{"path": "viminimg/viminimg.py"}],
+    "viportal": [
+        {"path": "viportal/viportal.py"},
+        {
+            "path": "viportal/viportal.py",
+            "newname": "port",
+            "flags": ["--noconsole"]
+        }],
+    "vichss": [{"path": "vichss/vichss.py", "newname": "chss"}],
+    "viencode": [{"path": "viencode/viencode.py"}]
+}

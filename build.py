@@ -1,5 +1,8 @@
 import PyInstaller.__main__
 import sys
+import os
+import json
+
 
 import argparse
 
@@ -13,14 +16,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args(sys.argv[1:])
 
-    paths = {
-        "viminimg": [{"path": "viminimg/viminimg.py"}],
-        "portal": [{"path": "portal/portal.py"}, {"path": "portal/portal.py", "newname": "port", "flags": ["--noconsole"]}]
-    }
+    script_path = os.path.dirname(os.path.realpath(sys.argv[0]))
+    config_path = script_path + '\\.buildconfig'
+
+    paths = None
+    with open(config_path, "r") as f:
+        paths = json.load(f)
+
+    if not paths:
+        print("Builder has no config")
+        sys.exit(0)
 
     keys = args.keys
 
-    if not keys:
+    if "*" in keys:
         keys = paths.keys()
 
     print("Building: " + str(keys))

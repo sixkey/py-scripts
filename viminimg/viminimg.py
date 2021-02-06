@@ -108,6 +108,31 @@ def create_rescale(max_size: int, height: bool = False):
     return rescale
 
 
+def create_crop(crop_ratio_w: int, crop_ratio_h: int) -> None:
+    def crop(original_picture, picture, file_name, original_file_name,
+             index):
+        log(f"Cropping {file_name} to {crop_ratio_w}:{crop_ratio_h}")
+
+        o_width, o_height = picture.size
+
+        f_width, f_height = o_height * (crop_ratio_w / crop_ratio_h), o_height
+
+        if f_width > o_width:
+            f_width, f_height = o_width, o_width * \
+                (crop_ratio_h / crop_ratio_w)
+
+        picture = picture.crop(
+            o_width // 2 - f_width // 2,
+            o_height // 2 - f_height // 2,
+            o_width // 2 + f_width // 2,
+            o_height // 2 + f_height // 2,
+        )
+
+        return original_picture, picture, file_name, original_file_name, index
+
+    return crop
+
+
 def create_save(quality: Optional[int] = None):
     def save(original_picture, picture, file_name, original_file_name, index):
         if quality is None:
@@ -360,38 +385,38 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Execute commands on folder of images")
     parser.add_argument(
-        '--resfolder', help="The result folder. It will be deleted at " +
-        "the start!. If not set the folder will be the <original>_viminimg.")
+        '--resfolder', help="the result folder. It will be deleted at " +
+        "the start! If not set the folder will be the <original>_viminimg")
     parser.add_argument(
         '--maxheight', action='store_const', const=True,
-        help="If set, scaling will be in regards to height.")
+        help="if set, scaling will be in regards to height")
     parser.add_argument(
-        '-s', '--scale', type=int, help="The max width (if --maxheight " +
+        '-s', '--scale', type=int, help="the max width (if --maxheight " +
         "present max height)")
     parser.add_argument(
-        '-c', '--compression_quality', type=int, help="The quality of the " +
-        "final save if compressing.")
+        '-c', '--compression_quality', type=int, help="the quality of the " +
+        "final save if compressing")
     parser.add_argument(
-        '-m', '--modes', help="Modes n - do nothing, c - compress, s - " +
+        '-m', '--modes', help="modes n - do nothing, c - compress, s - " +
         "scale. To separate different modes use _. Example: n_s_sc -> " +
         "save original picture and save scaled picture and save scaled " +
         "and compressed picture")
     renaming_group = parser.add_mutually_exclusive_group()
     renaming_group.add_argument(
-        '-r', '--rename', help="Format for renaming. $ is the variable " +
+        '-r', '--rename', help="format for renaming. $ is the variable " +
         "for index example: img$ -> img0.jpg, img1.jpg, img2.jpg")
     renaming_group.add_argument(
-        '-i', '--indexed', action='store_const', const=True, help="Will " +
+        '-i', '--indexed', action='store_const', const=True, help="will " +
         "rename images to <index in folder>.<extension>")
 
     parser.add_argument('--verbose', action='store_const', const=True,
-                        help="If set, application will log all the actions.")
-    parser.add_argument('orgfolder', type=dir_path, help="The path to the " +
-                        "folder.")
+                        help="if set, application will log all the actions")
+    parser.add_argument('orgfolder', type=dir_path, help="the path to the " +
+                        "folder")
     parser.add_argument('--metadata', action="store_const", const=True,
-                        help="If set, application will produce metadata json")
+                        help="if set, application will produce metadata json")
     parser.add_argument('--jpeg', action="store_const", const=True,
-                        help="If set, application will convert everything " +
+                        help="if set, application will convert everything " +
                         "to jpg")
 
     args = parser.parse_args(sys.argv[1:])
@@ -440,8 +465,6 @@ if __name__ == "__main__":
 
     for mode in args.modes.split("_"):
         bricks += build_mode(mode, args, name_transform)
-
-    print("\n".join([x.__name__ for x in bricks]))
 
     transformer = build_file_transformer(bricks, 1, res_files)
 
