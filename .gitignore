@@ -1,4 +1,4 @@
-.tbl
+*.tbl
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -128,4 +128,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-viminidb/doxx_table.tbl

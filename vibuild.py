@@ -19,27 +19,27 @@ if __name__ == "__main__":
     script_path = os.path.dirname(os.path.realpath(sys.argv[0]))
     config_path = script_path + '\\.buildconfig'
 
-    paths = None
+    profiles = None
     with open(config_path, "r") as f:
-        paths = json.load(f)
+        profiles = json.load(f)["profiles"]
 
-    if not paths:
+    if not profiles:
         print("Builder has no config")
         sys.exit(0)
 
     keys = args.keys
 
     if "*" in keys:
-        keys = paths.keys()
+        keys = profiles.keys()
 
     print("Building: " + str(keys))
 
     for key in keys:
-        if key not in paths:
+        if key not in profiles:
             print(f"Error: key {key} doesn't exist")
             continue
 
-        profile = paths[key]
+        profile = profiles[key]
 
         for build in profile:
             path = build["path"]
