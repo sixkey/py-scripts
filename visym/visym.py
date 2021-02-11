@@ -10,6 +10,10 @@ from pylatexenc.latex2text import LatexNodes2Text
 
 
 def parse_latex(string: str) -> str:
+    match = re.match(r"\\frac\{([\s\S]*)\}\{([\s\S]*)\}", string)
+    string = re.sub(r"\\frac\{([\s\S]*)\}\{([\s\S]*)\}",
+                    r"\\frac{(\1)}{(\2)}", string)
+    print(string)
     return LatexNodes2Text().latex_to_text(string)
 
 
