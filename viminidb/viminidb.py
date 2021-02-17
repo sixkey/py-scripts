@@ -2,12 +2,14 @@ from typing import (List, Any, Set,
                     Optional, Tuple, Callable,
                     Dict, Deque, DefaultDict, Union, Literal)
 
-from videbugging import create_loud_function
+from videbugging import create_loud_function, create_louder_function
 
 import os
 import sys
 import re
 import argparse
+import traceback
+import logging
 from datetime import datetime, date, time
 from collections import deque, defaultdict
 
@@ -27,25 +29,43 @@ ColDefinition = Tuple['Attribute', bool, Optional[str]]
 
 ENCLOSINGS = {
     "parentheses": ("(", ")"),
-    "braces": ('{', "}"),
-    "brackets": ("[", "]")
+    "braces": ('{', "}")
 }
 
+
+def dateformat_to_regex(string: str) -> str:
+    string = string.replace("%Y", r"\d{4}")
+    string = string.replace("/", r"/")
+    string = string.replace(".", r"\.")
+
+    for char in "mdHMS":
+        string = string.replace(f"%{char}", r"\d{2}")
+
+    return string
+
+
+DATE_FORMATS = [(x, dateformat_to_regex(x)) for x in [
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%Y-%m-%d %H",
+    "%Y-%m-%d",
+    "%Y/%m/%d/%H/%M/%S",
+    "%Y/%m/%d/%H/%M",
+    "%Y/%m/%d/%H",
+    "%Y/%m/%d",
+    "%d.%m.%Y %H:%M:%S",
+    "%d.%m.%Y %H:%M",
+    "%d.%m.%Y %H",
+    "%d.%m.%Y",
+]]
 
 RE_PATERNS = {
     "attr_shrt": r"(\w+)\[(\w+)]",
     "attr_lng": r"(\w+)\[(\w+)]\[([\s\S]*)\]",
-    "datetime": r"^\d{4}\-\d{2}\-\d{2} \d{2}:\d{2}$",
-    "date": r"^\d{4}\-\d{2}\-\d{2}$"
+    "datetime": "|".join([x[1] for x in DATE_FORMATS]),
+    "date": "|".join([x[1] for x in DATE_FORMATS]),
+    "null": r"None"
 }
-
-
-FORMATS = {
-    'datetime': "%Y-%m-%d %H:%M",
-    'date': "%Y-%m-%d"
-}
-
-
 # --------------- MISC
 
 
@@ -86,6 +106,191 @@ def lrpad(string: str, size: int, char: str = " ") -> str:
 
     return left_padding * char + string + right_padding * char
 
+
+def lpad(string: str, size: int, char: str = " ") -> str:
+    padding = size - len(string)
+    if padding <= 0:
+        return string
+    else:
+        return char * padding + string
+
+
+def rpad(string: str, size: int, char: str = " ") -> str:
+    padding = size - len(string)
+    if padding <= 0:
+        return string
+    else:
+        return string + char * padding
+
+
+def mlrow_to_slrows(strings: List[str]) -> List[List[str]]:
+    cols_split = [s.splitlines() for s in strings]
+    rows_size = [len(x) for x in cols_split]
+    rows = [([0] * len(strings))
+            for i in range(max(rows_size))]
+    for index_col, col_string in enumerate(cols_split):
+        for index_row, row in enumerate(col_string):
+            rows[index_row][index_col] = row
+
+    return rows
+# --------------- TYPING
+
+
+class TypeVariable:
+    def __init__(self, name: str):
+        self.name = name
+
+    def get(self, context: Dict[str, str]):
+        if self.name not in context:
+            raise ValueError("Variable not defined")
+        return context[self.name]
+
+
+class TypeConst:
+    def __init__(self, value: str):
+        self.value = value
+
+    def get(self, context: Dict[str, str]):
+        return self.value
+
+    def __str__(self) -> str:
+        return str(self.value)
+
+
+def find_type_gcd(left: str, right: str) -> Optional[str]:
+    if left == right:
+        return left
+    if left in DOMAIN_INHERITANCE[right]:
+        return right
+    if right in DOMAIN_INHERITANCE[left]:
+        return left
+    return None
+
+
+# find_type_gcd = create_loud_function(find_type_gcd)
+
+
+def resolve_type_in_context(type_vars: Dict[str, str],
+                            type_tuple: Tuple[str, str]) -> Optional[Tuple[str, str]]:
+    type_val, type_name = type_tuple
+
+    if type_name in type_vars:
+        type_val = find_type_gcd(type_val, type_vars[type_name])
+
+    if not type_val:
+        return None
+
+    type_vars[type_name] = type_val
+    return type_val
+
+
+# resolve_type_in_context = create_loud_function(resolve_type_in_context)
+
+
+class TypeMask:
+    def __init__(self, left: Tuple[str, str], right: Tuple[str, str],
+                 output: Tuple[str, str]):
+        self.left = left
+        self.right = right
+        self.output = output
+
+        self.type_vars = {}
+
+        if (not resolve_type_in_context(self.type_vars, left) or
+            not resolve_type_in_context(self.type_vars, right) or
+            not resolve_type_in_context(self.type_vars, output)
+            ):
+            raise RuntimeError(f"Invalid mask type: {str(self)}")
+
+    def check(self, actual_left: str, actual_right: str) -> Optional[str]:
+        type_vars = dict(self.type_vars)
+
+        new_left = (actual_left, self.left[1])
+        new_right = (actual_right, self.right[1])
+
+        if (not resolve_type_in_context(type_vars, new_left) or
+                not resolve_type_in_context(type_vars, new_right)):
+            return None
+        else:
+            return type_vars[self.output[1]]
+
+    def __str__(self):
+        return (f"{self.left[0]} {self.left[1]} -> " +
+                f"{self.right[0]} {self.right[1]} -> " +
+                F"{self.output[0]} {self.output[1]}")
+
+
+class TypeRelation:
+    def __init__(self, left: Any, right: Any, type_mask: TypeMask):
+        self.left = left
+        self.right = right
+        self.type_mask = type_mask
+
+    def get(self, context: Dict[str, str]) -> Optional[str]:
+        left_type = self.left.get(context)
+        right_type = self.right.get(context)
+
+        output_type = self.type_mask.check(left_type, right_type)
+
+        if not output_type:
+            raise RuntimeError(f"Invalid types {left_type} and " +
+                               f"{right_type} are not supported under " +
+                               f"the type mask {str(self.type_mask)}")
+        return output_type
+
+    def __str__(self):
+        return str(self.type_mask)
+
+
+Typing = Union[TypeConst, TypeVariable, TypeRelation]
+
+
+class TypedFunction:
+    def __init__(self, function: Callable[[Any], Any], typing: Typing):
+        self.function = function
+        self.typing = typing
+
+    def get_type(self, context: Dict[str, str]):
+        return self.typing.get(context)
+
+    def __repr__(self) -> str:
+        return f"TypedFunction {str(self.typing)}"
+
+
+TYPE_TREE = {
+    "any": [],
+    "num": ["any"],
+    "int": ["num"],
+    "float": ["int"],
+    "fun": ["any"],
+    "row_function": ["fun"],
+    "table_transform": ["fun"],
+
+    "bool": ["any"],
+    "str": ["any"],
+    "date": ["any"],
+    "datetime": ["any"],
+}
+
+TYPE_TREE['null'] = [x for x in TYPE_TREE]
+
+
+def transitive_closure(dictionary: [Any, Any]):
+
+    res: DefaultDict[Set[str]] = defaultdict(set)
+
+    for key, vals in dictionary.items():
+        res[key] |= set(dictionary[key])
+        for val in vals:
+            res[key] |= set(dictionary[val])
+
+    if res == dictionary:
+        return res
+    else:
+        return transitive_closure(res)
+
+
+DOMAIN_INHERITANCE = transitive_closure(TYPE_TREE)
 
 # --------------- CASTING
 
@@ -129,9 +334,19 @@ def to_float(value: Any) -> Optional[float]:
         return None
 
 
+def str_to_datetime(value: str) -> Optional[datetime]:
+    for form, regex in DATE_FORMATS:
+        if re.match(regex, value):
+            return datetime.strptime(value, form)
+    return None
+
+
 def to_datetime(value: Any) -> DateTime:
     if isinstance(value, str):
-        return datetime.strptime(value, FORMATS['datetime'])
+        parsed = str_to_datetime(value)
+        if not parsed:
+            raise RuntimeError("Invalid date format")
+        return parsed
     elif isinstance(value, datetime):
         return value
     elif isinstance(value, date):
@@ -144,7 +359,10 @@ def to_datetime(value: Any) -> DateTime:
 
 def to_date(value: Any) -> Date:
     if isinstance(value, str):
-        return datetime.strptime(value, FORMATS['date']).date()
+        parsed = str_to_datetime(value)
+        if not parsed:
+            raise RuntimeError("Invalid date format")
+        return parsed.date()
     elif isinstance(value, datetime):
         return value.date
     elif isinstance(value, date):
@@ -171,6 +389,24 @@ def to_attribute(value: Any) -> 'Attribute':
     else:
         raise RuntimeError(
             "Invalid format, to_attribute works only with string")
+
+
+def is_null(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str) and re.match(RE_PATERNS['null'], value):
+        return True
+    else:
+        return False
+
+
+def to_null(value: Any) -> None:
+    if is_null(value):
+        return None
+    else:
+        raise ValueError("The value is not none")
+
+
 # --------------- DOMAINS
 
 
@@ -205,7 +441,8 @@ PREMADE_DOMAINS = {
     "bool": AttributeDomain("bool", to_bool),
     "str": AttributeDomain("str", to_str),
     "date": AttributeDomain("date", to_date),
-    "datetime": AttributeDomain("datetime", to_datetime)
+    "datetime": AttributeDomain("datetime", to_datetime),
+    "null": AttributeDomain("null", to_null)
 }
 
 
@@ -218,6 +455,7 @@ VAL_TESTERS = {
     "str": lambda x: isinstance(x, str),
     "date": lambda x: isinstance(x, date),
     "datetime": lambda x: isinstance(x, datetime),
+    "null": lambda x: x is None
 }
 
 
@@ -227,7 +465,8 @@ VALUE_PARSINGS = {
     "datetime": (RE_PATERNS['datetime'], to_datetime),
     "date": (RE_PATERNS['date'], to_date),
     "bool": (r"^True$|^False$", string_to_bool),
-    "attribute": (RE_PATERNS["attr_shrt"], to_attribute)
+    "attribute": (RE_PATERNS["attr_shrt"], to_attribute),
+    "null": (RE_PATERNS["null"], to_null)
 }
 
 
@@ -246,10 +485,11 @@ def str_to_attribute(string: str) -> Optional[Attribute]:
 # --------------- TABLE
 
 
-def row_to_str(row: Row, col_width: int) -> str:
+def row_to_str(row: Row, *col_widths) -> str:
     res = ""
-    for value in row:
-        res += lrpad(str(value), col_width) + "|"
+    for index, value in enumerate(row):
+        res += rpad(" " + str(value),
+                    col_widths[index % len(col_widths)]) + "|"
     return res[:-1]
 
 
@@ -262,133 +502,259 @@ def row_to_csv(row: Row, delimeter: str = ";") -> str:
     return res
 
 
+class Column:
+    def __init__(self, attribute: Attribute, is_key: bool,
+                 default_value: Optional[str], optional: bool = True):
+        self.attribute = attribute
+        self.is_key = is_key
+        self.optional = optional and not is_key
+        self.default_value = default_value
+
+    def get_name(self):
+        return self.attribute.name
+
+    def get_type(self):
+        return self.attribute.domain.name
+
+    def copy(self):
+        return Column(Attribute(self.get_name(), self.attribute.domain),
+                      self.is_key,
+                      self.default_value)
+
+    def __str__(self):
+        return f"{'*' if self.is_key else ''}{str(self.attribute)}"
+
+
+Key = Tuple[Any, ...]
+
+
+class TableIndex:
+    def __init__(self):
+        self.index = {}
+
+    def add(self, key: Key, row: Row):
+        self.index[key] = row
+
+    def remove(self, key: Key):
+        del self.index[key]
+
+
 class Table:
     def __init__(self, name: str,
-                 col_definitions: List[ColDefinition]):
-
-        attributes = []
-        defs = []
-        keys = set()
-        def_indexes = []
-
-        for index, (attribute, key, def_value) in enumerate(col_definitions):
-            attributes.append(attribute)
-
-            if def_value is not None:
-                defs.append(def_value)
-                def_indexes.append(index)
-            if key:
-                keys.add(attribute.name)
-
-        def row_transformer(row: Row, table_context: Table):
-            new_row = []
-            i = 0
-            size = 0
-            def_i = 0
-            while i < len(row):
-                if def_i < len(def_indexes) and def_indexes[def_i] == size:
-                    def_value = defs[def_i]
-                    new_row.append(get_def_value(def_value, table_context))
-                    def_i += 1
-                else:
-                    new_row.append(row[i])
-                    i += 1
-                size += 1
-
-            return new_row
+                 cols: List[Column]):
 
         self.name = name
-        self.attributes = attributes
         self.rows: List[Row] = []
-        self.row_transformer = row_transformer
-        self.cols = {}
+        self.cols = cols
 
-        self.col_definitions = col_definitions
+        self.def_values = []
+        self.def_indexes = []
 
+        self.keys = set()
+        self.primary_keys = set()
+        self.key_mask = []
+
+        for index, col in enumerate(cols):
+            if col.default_value is not None:
+                self.def_values.append(col.default_value)
+                self.def_indexes.append(index)
+            if col.is_key:
+                self.keys.add(col.attribute.name)
+                self.key_mask.append(index)
+
+        self.col_to_index = {}
         self.id_counter = 0
 
-        for index, attribute in enumerate(attributes):
-            self.cols[attribute.name] = index
+        self.primary_index = TableIndex()
 
-        self.keys = keys
-        self.key_vals: DefaultDict[str, Set[Any]] = defaultdict(set)
+        for index, col in enumerate(self.cols):
+            self.col_to_index[col.get_name()] = index
 
     def copy_table(self) -> 'Table':
-        return Table(self.name + "_copy", self.col_definitions)
+        return Table(self.name + "_copy", [x.copy() for x in self.cols])
 
-    def check_row(self, row: Row) -> Optional[Row]:
+    def rename_col(self, index: int, new_name: str) -> None:
+
+        if self.cols[index].get_name() == new_name:
+            return
+
+        if new_name in self.col_to_index:
+            raise RuntimeError("The name of the column is already in use")
+
+        old_name = self.cols[index].get_name()
+
+        self.cols[index].attribute.name = new_name
+
+        if old_name in self.keys:
+            self.keys.remove(old_name)
+            self.keys.add(new_name)
+
+            self.key_vals[new_name] = self.key_vals[old_name]
+            del self.key_vals[old_name]
+
+    def cast_row(self, row: Row) -> Row:
 
         res_row = []
-        if len(row) != len(self.attributes):
+        if len(row) != len(self.cols):
             return None
 
-        for table_attr, row_value in zip(self.attributes, row):
-            if not table_attr.domain.contains(row_value):
-                return None
+        for col, row_value in zip(self.cols, row):
+
+            val_is_null = is_null(row_value)
+
+            if val_is_null and not col.optional:
+                raise ValueError(f"None value given to non-optional " +
+                                 "column: {str(col)}")
+            if not val_is_null and not col.attribute.domain.contains(row_value):
+                raise ValueError(f"The value {row_value} is outside the " +
+                                 f"columns {str(col)} domain")
             else:
-                res_row.append(table_attr.domain.cast(row_value))
+                if val_is_null:
+                    res_row.append(None)
+                else:
+                    res_row.append(col.attribute.domain.cast(row_value))
         return tuple(res_row)
+
+    def get_row_key(self, row: Row) -> Key:
+        return tuple([row[i] for i in self.key_mask])
+
+    def key_already_present(self, key: Key) -> bool:
+        return len(self.keys) != 0 and key in self.primary_keys
+
+    def update_key(self, key: Key, old_key: Optional[Key] = None) -> None:
+        if len(self.keys) != 0:
+            if old_key is not None and old_key in self.primary_keys:
+                self.primary_keys.remove(old_key)
+            self.primary_keys.add(key)
 
     def add_row(self, in_row: Row) -> None:
 
-        if len(in_row) != len(self.cols):
+        if len(in_row) != len(self.col_to_index):
             row = self.row_transformer(in_row, self)
         else:
             row = in_row
-        casted_row = self.check_row(row)
 
-        if casted_row is not None:
-            for key in self.keys:
-                if casted_row[self.cols[key]] in self.key_vals[key]:
-                    raise RuntimeError("Key already present")
-            self.rows.append(casted_row)
-            for key in self.keys:
-                self.key_vals[key].add(row[self.cols[key]])
-            self.id_counter += 1
-        else:
-            raise RuntimeError(f"Invalid row: {row} for {self.name}")
+        casted_row = self.cast_row(row)
+        row_key = self.get_row_key(casted_row)
 
-    def remove_row(self, row: Row) -> None:
-        i = 0
-        while i < len(self.rows):
-            if self.rows[i] == row:
-                self.rows.pop(i)
-                break
-            i += 1
+        if self.key_already_present(row_key):
+            raise ValueError("Key already present")
+
+        self.rows.append(casted_row)
+        self.update_key(row_key)
+
+        self.id_counter += 1
+
+    def find_row(self, row: Row) -> Optional[int]:
+        index = None
+        if row_key in self.primary_keys:
+            row_key = self.get_row_key(row)
+            i = 0
+            while i < len(self.rows):
+                if self.get_row_key(self.rows[i]) == row_key:
+                    index = i
+                    break
+                i += 1
+        return index
+
+    def remove_row(self, row: Row, index: Optional[int] = None) -> None:
+
+        if index is None:
+            index = self.find_row(row)
+
+        if index is not None:
+            self.rows.pop(index)
+
+    def update_row(self, org_row: Row, new_row: Row,
+                   index: Optional[int] = None) -> None:
+
+        if index is None:
+            index = self.find_row(org_row)
+
+        if index is not None:
+            self.rows[index] = new_row
+            new_key = self.get_row_key(new_row)
+            old_key = self.get_row_key(org_row)
+            if new_key != old_key:
+                if self.key_already_present(new_key):
+                    raise ValueError("Key already present")
+                self.update_key(new_key, self.get_row_key(org_row))
 
     def remove_rows(self, rows: List[Row]) -> None:
         for row in rows:
             self.remove_row(row)
 
+    def row_transformer(self, row: Row, table_context: 'Table') -> Row:
+
+        new_row = []
+        i = 0
+        size = 0
+        def_i = 0
+
+        while i < len(row):
+            if def_i < len(self.def_indexes) and self.def_indexes[def_i] == size:
+                def_value = self.def_values[def_i]
+                new_row.append(get_def_value(def_value, table_context))
+                def_i += 1
+            else:
+                new_row.append(row[i])
+                i += 1
+            size += 1
+
+        return new_row
+
     def __getitem__(self, colname: str) -> int:
-        return self.cols[colname]
+        return self.col_to_index[colname]
 
     def __str__(self) -> str:
 
-        col_width = 20
-        total_width = len(self.attributes) * col_width + \
-            len(self.attributes) - 1
-        divider = "\n" + (total_width) * "-" + "\n"
+        str_rows = []
 
-        res = "\n" + lrpad(self.name, total_width)
-        res += "\n\n"
-        res += row_to_str(tuple([("*" if x.name in self.keys else "") +
-                                 str(x) for x in self.attributes]), 20)
-
-        res += divider
-
+        cur_str_row = [f"{x.get_name()}\n[{x.get_type()}]" for x in self.cols]
+        str_rows.append(cur_str_row)
         for row in self.rows:
-            res += row_to_str(row, 20)
-            res += divider
+            cur_str_row = [str(x) for x in row]
+            str_rows.append(cur_str_row)
+
+        total_rows = [mlrow_to_slrows(x) for x in str_rows]
+
+        col_widths = [0] * len(self.cols)
+
+        for total_row in total_rows:
+            for line in total_row:
+                col_widths = [max(col_widths[i], len(line[i]) + 2)
+                              for i in range(len(line))]
+
+        total_width = sum(col_widths) + len(self.cols) - 1
+
+        divider = (total_width) * "-"
+        res = "\n" + lrpad(self.name, total_width) + "\n"
+        res += row_to_str(tuple(), 20)
+
+        res += divider + "\n"
+
+        for total_row in total_rows:
+            for line in total_row:
+                res += row_to_str(line, *col_widths) + "\n"
+            res += divider + "\n"
 
         return res
+
+
+def get_typecontext_from_table(table: Table):
+    context = {}
+
+    for col in table.cols:
+        context[col.get_name()] = col.get_type()
+
+    return context
 
 
 # --------------- DEF COLS
 
 
 def create_def_cols(attributes: List[Attribute]) -> List[ColDefinition]:
-    return [(x, False, None) for x in attributes]
+    return [Column(x, False, None) for x in attributes]
 
 
 # --------------- TABLE IO
@@ -406,7 +772,7 @@ def load_table_from(file_path: str) -> Table:
             attribute_parsed = str_to_attribute(col_name)
             if attribute_parsed:
                 col_defs.append(
-                    (attribute_parsed, string_to_bool(col_key), col_def if col_def != "None" else None))
+                    Column(attribute_parsed, string_to_bool(col_key), col_def if col_def != "None" else None))
             else:
                 RuntimeError("Unable to parse attribute")
         table = Table(table_name, col_defs)
@@ -420,9 +786,10 @@ def load_table_from(file_path: str) -> Table:
 
 def write_table_to(table: Table, file_path: str) -> None:
     with open(file_path, "w", encoding="utf-8") as f:
-        f.write(table.name + ";" + str(len(table.cols)) + "\n")
+        f.write(table.name + ";" + str(len(table.col_to_index)) + "\n")
 
-        for attribute, key, def_value in table.col_definitions:
+        for col in table.cols:
+            attribute, key, def_value = col.attribute, col.is_key, col.default_value
             f.write(row_to_csv(tuple([str(attribute), key, def_value])) + "\n")
 
         for index, row in enumerate(table.rows):
@@ -443,6 +810,16 @@ def list_tables(storage_path: str) -> List[str]:
 
 def get_local_storage() -> str:
     return os.path.dirname(os.path.realpath(sys.argv[0])) + "\\.viminidbstorage"
+
+
+def get_db_storage(filename: str = None) -> str:
+    addition = "" if filename is None else "\\" + filename
+    return get_local_storage() + "\\tables" + addition
+
+
+def get_scripts_storage(filename: str = None) -> str:
+    addition = "" if filename is None else "\\" + filename
+    return get_local_storage() + "\\scripts" + addition
 
 
 def load_table_factory(storage_path: str, table_name: str) -> TableAction:
@@ -469,57 +846,93 @@ def get_def_value(def_value: str, table_context: Table):
         return def_value
 
 
-def create_table_from_cols(name: str, cols: List[ColDefinition]) -> Table:
+def create_table_from_cols(name: str, cols: List[Column]) -> Table:
     return Table(name, cols)
 
 
 # --------------- FACTORIES
 
 
-def create_table_factory(name: str, cols: List[ColDefinition]) -> TableAction:
+def create_table_factory(name: str, cols: List[Column]) -> TableAction:
     def create_table(table: Table) -> Table:
         new_table = create_table_from_cols(name, cols)
         return new_table
     return create_table
 
 
-def selection_factory(predicate: Predicate) -> TableAction:
+def selection_factory(predicate: 'TypedFunction') -> TableAction:
     def selection(table: Table) -> Table:
         new_table = table.copy_table()
         new_table.name = "selection_table"
 
         for row in table.rows:
-            if predicate(row, table):
+            if predicate.function(row, table):
                 new_table.add_row(row)
         return new_table
     return selection
 
 
-def projection_factory(row_functions: List[Callable[[Row], Any]], attributes: List[Attribute]) -> TableAction:
+def projection_factory(row_functions: List[TypedFunction]) -> TableAction:
 
     def projection(table: Table) -> Table:
         new_attributes = []
 
-        for attr in attributes:
-            if attr not in table.cols:
-                raise RuntimeError("Attribute not in table")
-            new_attributes.append(table.attributes[table.cols[attr.name]])
+        for index, function in enumerate(row_functions):
+            fun_type = function.get_type(get_typecontext_from_table(table))
+            new_attributes.append(def_attribute(f"col_{index}", fun_type))
 
         new_table = Table("projection_table", create_def_cols(new_attributes))
 
         for row in table.rows:
             new_row = []
-            for attr in attributes:
-                new_row.append(row[table.cols[attr.name]])
+            for function in row_functions:
+                new_row.append(function.function(row, table))
             new_table.add_row(tuple(new_row))
         return new_table
 
     return projection
 
 
-def rename_factory(name: str) -> TableAction:
+def update_factory(condition: TypedFunction, row_functions: List[TypedFunction]) -> TableAction:
+
+    def update(table: Table) -> Table:
+
+        if len(table.cols) != len(row_functions):
+            raise ValueError("The number of functions in update doesn't " +
+                             f"match the number of columns: " +
+                             f"{len(table.cols)} != {len(row_functions)}")
+
+        for index, row in enumerate(table.rows):
+            if condition.function(row, table):
+                new_row = [f.function(row, table) for f in row_functions]
+                table.update_row(row, tuple(new_row), index)
+
+        return table
+
+    return update
+
+
+def remove_factory(condition: TypedFunction):
+
+    def remove(table: Table) -> Table:
+        i = 0
+        while i < len(table.rows):
+            if condition.function(table.rows[i], table):
+                table.remove_row(table.rows[i], i)
+            else:
+                i += 1
+        return table
+    return remove
+
+
+def rename_factory(name: str, attributes: Optional[List[str]]) -> TableAction:
     def rename(table: Table) -> Table:
         table.name = name
+
+        if attributes:
+            for index, attribute in enumerate(attributes):
+                table.rename_col(index, attribute)
+
         return table
     return rename
 
@@ -544,14 +957,16 @@ def join_factory(type: str, left: TableAction, right: TableAction, condition) ->
 
         if condition:
             raise RuntimeError("Condition is not yet supported")
+
         same_attributes = []
-        final_attributes = left_table.attributes[:]
+        final_attributes = left_table.cols[:]
         right_indexes = []
         for r_attribute in right_table.attributes:
-            if r_attribute.name in left_table.cols:
+            if r_attribute.name in left_table.col_to_index:
                 same_attributes.append(r_attribute)
             else:
-                right_indexes.append(right_table.cols[r_attribute.name])
+                right_indexes.append(
+                    right_table.col_to_index[r_attribute.name])
                 final_attributes.append(r_attribute)
 
         def final_transformer(left: Row, right: Row):
@@ -564,7 +979,7 @@ def join_factory(type: str, left: TableAction, right: TableAction, condition) ->
             for r_row in right_table.rows:
                 add = True
                 for attr in same_attributes:
-                    if l_row[left_table.cols[attr.name]] != r_row[right_table.cols[attr.name]]:
+                    if l_row[left_table.col_to_index[attr.name]] != r_row[right_table.col_to_index[attr.name]]:
                         add = False
                         break
                 if add:
@@ -590,10 +1005,24 @@ def nothing_factory() -> TableAction:
 
 def sort_factory(attributes: List[str]) -> TableAction:
     def sort(table: Table) -> Table:
-        table.rows.sort(key=lambda x: [x[table.cols[attr]]
+        table.rows.sort(key=lambda x: [x[table.col_to_index[attr]]
                                        for attr in attributes])
         return table
     return sort
+
+
+def script_factory(script_name: str, arguments: List[str]) -> TableAction:
+    query = read_script(script_name)
+
+    def script(table: Table) -> Table:
+        try:
+            group = execute_query(
+                query, arguments, False, False, False, False)
+        except:
+            raise RuntimeError(f"Script {script_name} failed, there is , " +
+                               "probably additional error output above")
+        return group[0]
+    return script
 
 
 # --------------- QUERY PARSING
@@ -615,30 +1044,55 @@ def make_tuple(x: Any, y: Any) -> Row:
         return (x, y)
 
 
+def in_function(value: Any, table: Table) -> TableAction:
+    if len(table.cols) != 1:
+        raise ValueError("Operator 'in' works only in tables " +
+                         "with one column")
+    for row in table.rows:
+        if row[0] == value:
+            return True
+    return False
+
+
+logic = TypeMask(("any", "a"), ("any", "a"), ("bool", "b"))
+arithmetic = TypeMask(("num", "a"), ("num", "a"), ("num", "a"))
+
+
 BINARY_OPERATIONS = {
-    ".": lambda x, y: dot(x, y),
-    ",": lambda x, y: make_tuple(x, y),
-    "&&": lambda x, y: x and y,
-    "||": lambda x, y: x or y,
+    ".": (lambda x, y: dot(x, y), TypeMask(("fun", "a"), ("fun", "b"), ("fun", "c"))),
+    ">>": (lambda x, y: dot(y, x), TypeMask(("fun", "a"), ("fun", "b"), ("fun", "c"))),
+    ",": (lambda x, y: make_tuple(x, y), TypeMask(("any", "a"), ("any", "b"), ("tuple", "c"))),
+    "=>": (lambda x, y: in_function(x, y(None)),
+           TypeMask(("any", "a"), ("fun", "b"), ("bool", "c"))),
+    "!>": (lambda x, y: not in_function(x, y(None)),
+           TypeMask(("any", "a"), ("fun", "b"), ("bool", "c"))),
+    "&&": (lambda x, y: x and y, logic),
+    "||": (lambda x, y: x or y, logic),
 
-    "==": lambda x, y: x == y,
-    "!=": lambda x, y: x != y,
-    "<=": lambda x, y: x <= y,
-    ">=": lambda x, y: x >= y,
-    "<": lambda x, y: x < y,
-    ">": lambda x, y: x > y,
+    "==": (lambda x, y: x == y, logic),
+    "!=": (lambda x, y: x != y, logic),
+    "<=": (lambda x, y: x <= y, logic),
+    ">=": (lambda x, y: x >= y, logic),
+    "<": (lambda x, y: x < y, logic),
+    ">": (lambda x, y: x > y, logic),
 
-    "+": lambda x, y: x + y,
-    "-": lambda x, y: x - y,
-    "%": lambda x, y: x % y,
-    "*": lambda x, y: x * y,
-    "/": lambda x, y: x / y,
-    "^": lambda x, y: x ** y
+    "+": (lambda x, y: x + y, arithmetic),
+    "-": (lambda x, y: x - y, arithmetic),
+    "%": (lambda x, y: x % y, arithmetic),
+    "*": (lambda x, y: x * y, arithmetic),
+    "//": (lambda x, y: x // y, arithmetic),
+    "/": (lambda x, y: x / y, TypeMask(("num", "a"), ("num", "a"), ("float", "a"))),
+    "^": (lambda x, y: x ** y, arithmetic),
+
+
 }
 
 OPERATORS_LEVELS = {
     ".": 1,
+    ">>": 1,
     ",": 2,
+    "=>": 2,
+    "!>": 2,
 
     "&&": 3,
     "||": 3,
@@ -655,6 +1109,7 @@ OPERATORS_LEVELS = {
     "%": 6,
     "*": 6,
     "/": 6,
+    "//": 6,
     "^": 7
 }
 
@@ -669,7 +1124,10 @@ DB_FUNCTIONS_ARITIES = {
     "select": 1,
     "join": (3, 4),
     "sort": (1, "*"),
+    "update": (1, "*"),
+    "remove": 1,
     "nothing": 0,
+    "script": (1, "*"),
 }
 
 
@@ -724,37 +1182,71 @@ def result_to_val_tuple(result: Any) -> Tuple[str, str, Any]:
 Operation = Any
 
 
+def cast_to_row_function(token: ParsedToken) -> TypedFunction:
+    t_state, t_type, t_val = token
+    if t_state == "val":
+        if t_type != "row_function":
+            return TypedFunction(lambda row, table: t_val, TypeConst(t_type))
+        else:
+            return t_val
+    if t_state == "var":
+        return TypedFunction(lambda row, table: row[table.col_to_index[t_val]], TypeVariable(t_val))
+    else:
+        raise ValueError(f"{token} can't be parsed")
+
+
 def build_row_expression(left: ParsedToken, right: ParsedToken, operation: Operation) -> ParsedToken:
     left_state, left_type, left_val = left
     right_state, right_type, right_val = right
 
     if left_state == "val" and right_state == "val":
         if left_type != "row_function" and right_type != "row_function":
-            return result_to_val_tuple(operation(left_val, right_val))
+            return result_to_val_tuple(operation[0](left_val, right_val))
+
+    left_type_object = None
+
+    if left_state == "val":
+        if left_type == "row_function":
+            left_type_object = left_val.typing
+        else:
+            left_type_object = TypeConst(left_type)
+    elif left_state == "var":
+        left_type_object = TypeVariable(left_val)
+
+    right_type_object = None
+
+    if right_state == "val":
+        if right_type == "row_function":
+            right_type_object = right_val.typing
+        else:
+            right_type_object = TypeConst(right_type)
+    elif right_state == "var":
+        right_type_object = TypeVariable(right_val)
 
     def expression(row: Row, table: Table) -> ParsedToken:
         left_final_value = None
         if left_state == "var":
-            left_final_value = row[table.cols[left_val]]
+            left_final_value = row[table.col_to_index[left_val]]
         elif left_state == "val":
             if left_type == "row_function":
-                left_final_value = left_val(row, table)
+                left_final_value = left_val.function(row, table)
             else:
                 left_final_value = left_val
 
         right_final_value = None
 
         if right_state == "var":
-            right_final_value = row[table.cols[right_val]]
+            right_final_value = row[table.col_to_index[right_val]]
         elif right_state == "val":
             if right_type == "row_function":
-                right_final_value = right_val(row, table)
+                right_final_value = right_val.function(row, table)
             else:
                 right_final_value = right_val
 
-        return operation(left_final_value, right_final_value)
+        return operation[0](left_final_value, right_final_value)
 
-    return "val", "row_function", expression
+    typing = TypeRelation(left_type_object, right_type_object, operation[1])
+    return "val", "row_function", TypedFunction(expression, typing)
 
 
 def tokenize_word(string: str) -> Token:
@@ -862,30 +1354,34 @@ def tokenize_input(string: str) -> List[Token]:
 
 # --------------- PARSING
 
+
 def check_args(function_name: str, args: Args) -> bool:
 
     args_num = len(args)
 
     arity = DB_FUNCTIONS_ARITIES[function_name]
 
+    correct_arity = True
+
     if isinstance(arity, int):
-        return args_num == arity
+        correct_arity &= args_num == arity
     elif isinstance(arity, tuple):
         lower_bound, upper_bound = arity
-        res = True
         if isinstance(lower_bound, int):
-            res &= args_num >= lower_bound
+            correct_arity &= args_num >= lower_bound
         if isinstance(upper_bound, int):
-            res &= args_num <= upper_bound
+            correct_arity &= args_num <= upper_bound
 
-        return res
+    if not correct_arity:
+        raise RuntimeError("The number of arguments doesn't match the " +
+                           f"functions arity, {args_num} not in {arity}")
 
-    return False
+    return correct_arity
 
 
 def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
 
-    storage_path = get_local_storage()
+    db_storage = get_db_storage()
     head_type, head_val = tokens[0]
     if len(tokens) == 1:
         if head_type == 'variable':
@@ -913,25 +1409,39 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
         arg_num = len(arg_tokens)
 
         if head_val == "project":
-            pass
-            #function = projection_factory([x.name for x in arg_tokens])
+            function = projection_factory(
+                [cast_to_row_function(x.get()) for x in arg_tokens])
+
+        if head_val == "script":
+            script_arguments = []
+            for script_arg in arg_tokens[1:]:
+                script_arguments.append(str(script_arg.get()[2]))
+            function = script_factory(arg_tokens[0].name, script_arguments)
+
+        if head_val == "update":
+            function = update_factory(cast_to_row_function(arg_tokens[0].get()),
+                                      [cast_to_row_function(x.get()) for x in arg_tokens[1:]])
+
+        if head_val == "remove":
+            function = remove_factory(
+                cast_to_row_function(arg_tokens[0].get()))
 
         elif head_val == "sort":
             function = sort_factory([x.name for x in arg_tokens])
 
         elif head_val == "load":
             if arg_tokens[0].tag == 'var':
-                function = load_table_factory(storage_path, arg_tokens[0].name)
+                function = load_table_factory(db_storage, arg_tokens[0].name)
             else:
                 print(arg_tokens[0].tag)
         elif head_val == "save":
             table_name = None
             if len(arg_tokens) == 1:
                 table_name = arg_tokens[0].name
-            function = save_table_factory(storage_path, table_name)
+            function = save_table_factory(db_storage, table_name)
 
         elif head_val == "create":
-            attributes = []
+            create_cols = []
 
             for i in range(1, len(arg_tokens)):
                 attribute, key, def_value = None, False, None
@@ -946,21 +1456,20 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
                             def_value = second
                 else:
                     attribute = package
-                attributes.append((attribute, key, def_value))
-            function = create_table_factory(arg_tokens[0].name, attributes)
+                create_cols.append(Column(attribute, key, def_value))
+            function = create_table_factory(arg_tokens[0].name, create_cols)
 
         elif head_val == "insert":
             insert_argument = arg_tokens[0]
-            if isinstance(insert_argument, Constant):
-                if insert_argument.val_type == "tuple":
-                    function = insert_factory(
-                        lambda x: [insert_argument.value])
-                elif insert_argument.val_type == "fun":
-                    function = insert_factory(
-                        lambda x: insert_argument.value(x).rows)
-                else:
-                    function = insert_factory(
-                        lambda x: [[insert_argument.value]])
+            if insert_argument.val_type == "tuple":
+                function = insert_factory(
+                    lambda x: [insert_argument.value])
+            elif insert_argument.val_type == "fun":
+                function = insert_factory(
+                    lambda x: insert_argument.value(x).rows)
+            else:
+                function = insert_factory(
+                    lambda x: [[insert_argument.value]])
         elif head_val == "select":
             function = selection_factory(arg_tokens[0].get()[2])
 
@@ -971,8 +1480,12 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
             function = nothing_factory()
 
         elif head_val == "rename":
+
             if arg_tokens[0].tag == "var":
-                function = rename_factory(arg_tokens[0].name)
+                attribute_names = None
+                if len(arg_tokens) > 1:
+                    attribute_names = [x.name for x in arg_tokens[1:]]
+                function = rename_factory(arg_tokens[0].name, attribute_names)
 
         elif head_val == "join":
             if arg_tokens[0].tag == 'var':
@@ -1010,9 +1523,9 @@ def parse_tokens(tokens: List[Token]) -> ExpressionAtom:
 
     offset = 0
     for (left, right) in brackets:
-        tokens = tokens[:left - offset] + \
-            [("parsed", parse_tokens(tokens[left + 1 - offset: right - offset]))
-             ] + tokens[right + 1 - offset:]
+        middle = [("parsed", parse_tokens(
+            tokens[left + 1 - offset: right - offset]))]
+        tokens = tokens[:left - offset] + middle + tokens[right + 1 - offset:]
         offset += right - left
 
     for level in range(0, 10):
@@ -1047,35 +1560,95 @@ def get_args() -> Args:
     parser.add_argument('-i', '--isolated', action="store_const", const=True,
                         help="If set starts session in isolation from context")
 
-    parser.add_argument('query', nargs="?", type=str, help="the main input")
+    parser.add_argument('-t', '--type', action="store_const", const=True,
+                        help="If set types the expression instead of execution")
+
+    parser.add_argument('-r', '--reset_session', action="store_const", const=True,
+                        help="If set, doesn't load context from last session")
+
+    group = parser.add_mutually_exclusive_group()
+
+    group.add_argument('-rs', '--record_script', type=str, help="Records " +
+                       "the query into a script file with name")
+
+    group.add_argument('-us', '--use_script', type=str,
+                       help="If set uses script with the query name")
+
+    parser.add_argument('--rec_raw', action='store_const', const='True',
+                        help="If set, records @ arguments.")
+
+    parser.add_argument('-v', '--verbose', action='store_const', const='True',
+                        help="If set, shows debbuging information")
+
+    parser.add_argument('main_args', nargs="*",
+                        type=str, help="the main input")
 
     return parser.parse_args(sys.argv[1:])
 
 
-def execute_query(query: str, isolation: bool) -> None:
+def subtitute_args(query: str, query_args: List[str]):
+    for i, arg in enumerate(query_args):
+        match = re.search(r"@" + str(i + 1) + r"\|(\w+)@", query)
+        if match:
+            arg_type = match.group(1)
+            if arg_type == 'str':
+                arg = f"'{arg}'"
+
+            query = re.sub(r"@" + str(i + 1) + r"\|(\w+)@", arg, query)
+            continue
+
+        match = re.search(r"@" + str(i + 1) + r"([\D$])", query)
+        if match:
+            query = re.sub(r"@" + str(i + 1) + r"([\D$])", arg + r"\1", query)
+            continue
+
+    return query
+
+
+# subtitute_args = create_louder_function(subtitute_args)
+
+
+def execute_query(query: str, query_args: List[str], type: bool,
+                  load: bool, save: bool,
+                  ret_original_query: bool = False) -> (
+                      Tuple[Optional[Table], Optional[Any]]):
+
+    original_query = query
+
+    query = subtitute_args(query, query_args)
+
     tokens = tokenize_input(query)
     tree = parse_tokens(tokens)
 
-    if isinstance(tree, Constant) and tree.val_type in ("table_transform", "fun"):
+    ret_query = query if not ret_original_query else original_query
+
+    if not type and isinstance(tree, Constant) and tree.val_type in ("table_transform", "fun"):
         function = tree.get()[2]
 
-        if not isolation:
+        if load:
             if os.path.exists(storage_path + "\\current.tbl"):
                 load_current = load_table_factory(storage_path, "current")
                 function = dot(function, load_current)
+        if save:
             save_current = save_table_factory(storage_path, "current")
-
             function = dot(save_current, function)
-        print(function(None))
+        return function(None), None, ret_query
     else:
-        print(tree)
+        return None, tree, ret_query
 
 
-if True:
-    # pass
-    tokenize_input = create_loud_function(tokenize_input)
-    # parse_tokens = create_loud_function(parse_tokens)
-    # starts_with = create_loud_function(starts_with)
+def read_script(name: str) -> str:
+    with open(get_scripts_storage(name + ".mndb"), "r", encoding="utf-8") as f:
+        lines = []
+        for l in f:
+            lines.append(l)
+        return " . ".join(lines)
+
+
+def save_script(name: str, lines: List[str]) -> None:
+    with open(get_scripts_storage(name + ".mndb"), "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
 
 if __name__ == "__main__":
     args = get_args()
@@ -1085,22 +1658,69 @@ if __name__ == "__main__":
     if not os.path.exists(storage_path):
         os.mkdir(storage_path)
 
+    if not os.path.exists(get_db_storage()):
+        os.mkdir(get_db_storage())
+
+    if not os.path.exists(get_scripts_storage()):
+        os.mkdir(get_scripts_storage())
+
+    if args.verbose:
+        tokenize_input = create_louder_function(tokenize_input)
+        parse_tokens = create_louder_function(parse_tokens)
+        build_row_expression = create_louder_function(build_row_expression)
+
     if args.list:
-        print(list_tables(storage_path))
+        print(list_tables(get_db_storage()))
+
+    query_history = []
 
     query_que: Deque[str] = deque()
-    if args.query:
-        query_que.append(args.query)
-    else:
+
+    if args.use_script:
+        query_que.append(read_script(args.use_script))
+
+    query = None
+    query_args = args.main_args if args.main_args else []
+
+    if not args.use_script and args.main_args:
+        query = args.main_args[0]
+        query_args = args.main_args[1:]
+
+    if query:
+        query_que.append(query)
+
+    if not query_que:
         user_input = input(">>> ")
         if user_input:
             query_que.append(user_input)
+
     while query_que:
         query = query_que.popleft()
 
-        execute_query(query, args.isolated)
+        load, save = True, True
+
+        if args.isolated:
+            load &= False
+            save &= False
+
+        if args.reset_session:
+            load &= False
+
+        try:
+            table, additional, executed_query = execute_query(
+                query, query_args, args.type, load, save, args.rec_raw)
+            query_history.append(executed_query)
+            if table:
+                print(table)
+            if additional:
+                print(additional)
+        except Exception as e:
+            logging.error(traceback.format_exc())
 
         if args.session:
             user_input = input(">>> ")
             if user_input:
                 query_que.append(user_input)
+
+    if query_history and args.record_script:
+        save_script(args.record_script, query_history)
