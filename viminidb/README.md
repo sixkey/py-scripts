@@ -195,10 +195,10 @@ vimindb currently supports following operators:
 Any query as a plain text saved as .mndb in the scripts folder can be run using
 
 ```
-viminidb -us <script_name>
+viminidb -us _script_name_
 ```
 
-If you run any query using -rs <script_name> that query will be and save with that name
+If you run any query using -rs _script_name_ that query will be and save with that name
 
 ```
 viminidb -rs "hello_world" "create helloworld lines[str] >> insert 'hello' >> insert 'world'"
@@ -225,7 +225,7 @@ will result in
 
 ## Queries with parameters
 
-Positional arguments given to viminidb after the query will be taken as arguments. You can catch these arguments using using $n or $n|type$ where n is the position of the argument (indexing from 1).
+Positional arguments that are given to viminidb after the query will be taken as arguments. You can catch these arguments using $n or $n|type$ where n is the position of the argument (indexing from 1).
 
 Running
 
