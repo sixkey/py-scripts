@@ -133,6 +133,12 @@ def mlrow_to_slrows(strings: List[str]) -> List[List[str]]:
             rows[index_row][index_col] = row
 
     return rows
+
+
+def str_map(lst: List[Any]) -> List[str]:
+    return [str(x) for x in lst]
+
+
 # --------------- TYPING
 
 
@@ -197,9 +203,9 @@ class TypeMask:
         self.type_vars = {}
 
         if (not resolve_type_in_context(self.type_vars, left) or
-            not resolve_type_in_context(self.type_vars, right) or
-            not resolve_type_in_context(self.type_vars, output)
-            ):
+                    not resolve_type_in_context(self.type_vars, right) or
+                    not resolve_type_in_context(self.type_vars, output)
+                ):
             raise RuntimeError(f"Invalid mask type: {str(self)}")
 
     def check(self, actual_left: str, actual_right: str) -> Optional[str]:
@@ -485,12 +491,15 @@ def str_to_attribute(string: str) -> Optional[Attribute]:
 # --------------- TABLE
 
 
-def row_to_str(row: Row, *col_widths) -> str:
-    res = ""
+def row_to_str(row: Row, seps: Tuple[str, str, str], *col_widths) -> str:
+    left, middle, right = seps
+    res = left
     for index, value in enumerate(row):
-        res += rpad(" " + str(value),
-                    col_widths[index % len(col_widths)]) + "|"
-    return res[:-1]
+        res += rpad(str(value),
+                    col_widths[index % len(col_widths)])
+        if index < len(row) - 1:
+            res += middle
+    return res + right
 
 
 def row_to_csv(row: Row, delimeter: str = ";") -> str:
@@ -545,33 +554,34 @@ class Table:
 
         self.name = name
         self.rows: List[Row] = []
-        self.cols = cols
 
-        self.def_values = []
-        self.def_indexes = []
+        self.cols = cols
+        self.col_to_index = {}
+        for index, col in enumerate(cols):
+            self.col_to_index[col.get_name()] = index
 
         self.keys = set()
         self.primary_keys = set()
         self.key_mask = []
-
         for index, col in enumerate(cols):
-            if col.default_value is not None:
-                self.def_values.append(col.default_value)
-                self.def_indexes.append(index)
             if col.is_key:
                 self.keys.add(col.attribute.name)
                 self.key_mask.append(index)
 
-        self.col_to_index = {}
+        self.def_values = []
+        self.def_indexes = []
+        for index, col in enumerate(cols):
+            if col.default_value is not None:
+                self.def_values.append(col.default_value)
+                self.def_indexes.append(index)
+
         self.id_counter = 0
-
         self.primary_index = TableIndex()
-
-        for index, col in enumerate(self.cols):
-            self.col_to_index[col.get_name()] = index
 
     def copy_table(self) -> 'Table':
         return Table(self.name + "_copy", [x.copy() for x in self.cols])
+
+    # COLS
 
     def rename_col(self, index: int, new_name: str) -> None:
 
@@ -584,16 +594,30 @@ class Table:
         old_name = self.cols[index].get_name()
 
         self.cols[index].attribute.name = new_name
+        self.col_to_index[new_name] = self.col_to_index[old_name]
+        del self.col_to_index[old_name]
 
         if old_name in self.keys:
             self.keys.remove(old_name)
             self.keys.add(new_name)
 
-            self.key_vals[new_name] = self.key_vals[old_name]
-            del self.key_vals[old_name]
+    # KEYS
+
+    def get_row_key(self, row: Row) -> Key:
+        return tuple([row[i] for i in self.key_mask])
+
+    def key_already_present(self, key: Key) -> bool:
+        return len(self.keys) != 0 and key in self.primary_keys
+
+    def update_key(self, key: Key, old_key: Optional[Key] = None) -> None:
+        if len(self.keys) != 0:
+            if old_key is not None and old_key in self.primary_keys:
+                self.primary_keys.remove(old_key)
+            self.primary_keys.add(key)
+
+    # ROW MANIPULATION
 
     def cast_row(self, row: Row) -> Row:
-
         res_row = []
         if len(row) != len(self.cols):
             return None
@@ -614,18 +638,6 @@ class Table:
                 else:
                     res_row.append(col.attribute.domain.cast(row_value))
         return tuple(res_row)
-
-    def get_row_key(self, row: Row) -> Key:
-        return tuple([row[i] for i in self.key_mask])
-
-    def key_already_present(self, key: Key) -> bool:
-        return len(self.keys) != 0 and key in self.primary_keys
-
-    def update_key(self, key: Key, old_key: Optional[Key] = None) -> None:
-        if len(self.keys) != 0:
-            if old_key is not None and old_key in self.primary_keys:
-                self.primary_keys.remove(old_key)
-            self.primary_keys.add(key)
 
     def add_row(self, in_row: Row) -> None:
 
@@ -703,6 +715,8 @@ class Table:
 
         return new_row
 
+    # OVERRIDING
+
     def __getitem__(self, colname: str) -> int:
         return self.col_to_index[colname]
 
@@ -722,21 +736,38 @@ class Table:
 
         for total_row in total_rows:
             for line in total_row:
-                col_widths = [max(col_widths[i], len(line[i]) + 2)
+                col_widths = [max(col_widths[i], len(line[i]))
                               for i in range(len(line))]
 
         total_width = sum(col_widths) + len(self.cols) - 1
 
-        divider = (total_width) * "-"
+        divider = (total_width) * "━"
+        dividers = ["─" * c_w for c_w in col_widths]
+        double_dividers = ["═" * c_w for c_w in col_widths]
+
         res = "\n" + lrpad(self.name, total_width) + "\n"
-        res += row_to_str(tuple(), 20)
 
-        res += divider + "\n"
+        norm_row = ("│", "│", "│")
+        div_start = ("┌", "┬", "┐")
+        div_section = ("╞", "╪", "╡")
+        div_middle = ("├", "┼", "┤")
+        div_bottom = ("└", "┴", "┘")
 
-        for total_row in total_rows:
+        res += row_to_str(dividers, div_start, *col_widths) + "\n"
+
+        row_count = len(total_rows)
+        for index, total_row in enumerate(total_rows):
             for line in total_row:
-                res += row_to_str(line, *col_widths) + "\n"
-            res += divider + "\n"
+                res += row_to_str(line, norm_row, * col_widths) + "\n"
+            seps_set = div_middle
+            div_set = dividers
+            if index == 0:
+                seps_set = div_section
+                div_set = double_dividers
+            if index == index == row_count - 1:
+                seps_set = div_bottom
+
+            res += row_to_str(div_set, seps_set, * col_widths) + "\n"
 
         return res
 
@@ -798,6 +829,10 @@ def write_table_to(table: Table, file_path: str) -> None:
                 f.write("\n")
 
 
+def delete_table(file_path: str) -> None:
+    os.remove(file_path)
+
+
 def list_tables(storage_path: str) -> List[str]:
 
     res = []
@@ -822,23 +857,6 @@ def get_scripts_storage(filename: str = None) -> str:
     return get_local_storage() + "\\scripts" + addition
 
 
-def load_table_factory(storage_path: str, table_name: str) -> TableAction:
-    def load(table: Table) -> Table:
-        new_table = load_table_from(storage_path + "\\" + table_name + ".tbl")
-        return new_table
-    return load
-
-
-def save_table_factory(storage_path: str, table_name: str = None) -> TableAction:
-    def save(table: Table) -> Table:
-        if table:
-            file_name = (table_name if table_name else table.name) + ".tbl"
-            file_path = storage_path + "\\" + file_name
-            write_table_to(table, file_path)
-        return table
-    return save
-
-
 def get_def_value(def_value: str, table_context: Table):
     if def_value == "%":
         return table_context.id_counter
@@ -858,6 +876,33 @@ def create_table_factory(name: str, cols: List[Column]) -> TableAction:
         new_table = create_table_from_cols(name, cols)
         return new_table
     return create_table
+
+
+def load_table_factory(storage_path: str, table_name: str) -> TableAction:
+    def load(table: Table) -> Table:
+        new_table = load_table_from(storage_path + "\\" + table_name + ".tbl")
+        return new_table
+    return load
+
+
+def save_table_factory(storage_path: str, table_name: str = None) -> TableAction:
+    def save(table: Table) -> Table:
+        if table:
+            file_name = (table_name if table_name else table.name) + ".tbl"
+            file_path = storage_path + "\\" + file_name
+            write_table_to(table, file_path)
+        return table
+    return save
+
+
+def drop_table_factory(storage_path: str, table_name: str = None) -> TableAction:
+    def drop(table: Table):
+        if table:
+            file_name = (table_name if table_name else table.name) + ".tbl"
+            file_path = storage_path + "\\" + file_name
+            delete_table(file_path)
+        return None
+    return drop
 
 
 def selection_factory(predicate: 'TypedFunction') -> TableAction:
@@ -927,7 +972,8 @@ def remove_factory(condition: TypedFunction):
 
 def rename_factory(name: str, attributes: Optional[List[str]]) -> TableAction:
     def rename(table: Table) -> Table:
-        table.name = name
+        if name:
+            table.name = name
 
         if attributes:
             for index, attribute in enumerate(attributes):
@@ -960,6 +1006,7 @@ def join_factory(type: str, left: TableAction, right: TableAction, condition) ->
 
         same_attributes = []
         final_attributes = left_table.cols[:]
+
         right_indexes = []
         for r_attribute in right_table.attributes:
             if r_attribute.name in left_table.col_to_index:
@@ -988,6 +1035,29 @@ def join_factory(type: str, left: TableAction, right: TableAction, condition) ->
         return final_table
 
     return join
+
+
+def table_prefix_attributes(table: Table):
+    for i, col in enumerate(table.cols):
+        table.rename_col(i, table.name + "_" + col.get_name())
+    return table
+
+
+def cartesian_factory(left: TableAction, right: TableAction, condition: TypedFunction = None) -> TableAction:
+    def cartesian(table: Table):
+        left_table = table_prefix_attributes(left(table))
+        right_table = table_prefix_attributes(right(table))
+
+        new_cols = left_table.cols + right_table.cols
+        final_table = Table("cartesian_product", new_cols)
+
+        for left_row in left_table.rows:
+            for right_row in right_table.rows:
+                new_row = tuple(list(left_row) + list(right_row))
+                if not condition or condition.function(new_row, final_table):
+                    final_table.add_row(new_row)
+        return final_table
+    return cartesian
 
 
 def print_factory() -> TableAction:
@@ -1114,19 +1184,26 @@ OPERATORS_LEVELS = {
 }
 
 DB_FUNCTIONS_ARITIES = {
+    "nothing": 0,
+    "print": 0,
+
+    "create": (2, "*"),
     "load": 1,
     "save": (0, 1),
-    "project": (1, "*"),
-    "create": (2, "*"),
-    "insert": 1,
+    "drop": (0, 1),
     "rename": (1, "*"),
-    "print": 0,
+
+    "project": (1, "*"),
     "select": 1,
-    "join": (3, 4),
-    "sort": (1, "*"),
-    "update": (1, "*"),
+
+    "insert": 1,
     "remove": 1,
-    "nothing": 0,
+    "update": (1, "*"),
+
+    "sort": (1, "*"),
+    "cartesian": (2, 3),
+    "join": (3, 4),
+
     "script": (1, "*"),
 }
 
@@ -1195,6 +1272,32 @@ def cast_to_row_function(token: ParsedToken) -> TypedFunction:
         raise ValueError(f"{token} can't be parsed")
 
 
+def get_token_type_object(token: ParsedToken) -> Optional[Typing]:
+    token_state, token_type, token_val = token
+    token_type_object = None
+    if token_state == "val":
+        if token_type == "row_function":
+            token_type_object = token_val.typing
+        else:
+            token_type_object = TypeConst(token_type)
+    elif token_state == "var":
+        token_type_object = TypeVariable(token_val)
+    return token_type_object
+
+
+def get_token_value(token: ParsedToken, row: Row, table: Table) -> Optional[Any]:
+    token_state, token_type, token_val = token
+    token_final_value = None
+    if token_state == "var":
+        token_final_value = row[table.col_to_index[token_val]]
+    elif token_state == "val":
+        if token_type == "row_function":
+            token_final_value = token_val.function(row, table)
+        else:
+            token_final_value = token_val
+    return token_final_value
+
+
 def build_row_expression(left: ParsedToken, right: ParsedToken, operation: Operation) -> ParsedToken:
     left_state, left_type, left_val = left
     right_state, right_type, right_val = right
@@ -1203,49 +1306,15 @@ def build_row_expression(left: ParsedToken, right: ParsedToken, operation: Opera
         if left_type != "row_function" and right_type != "row_function":
             return result_to_val_tuple(operation[0](left_val, right_val))
 
-    left_type_object = None
-
-    if left_state == "val":
-        if left_type == "row_function":
-            left_type_object = left_val.typing
-        else:
-            left_type_object = TypeConst(left_type)
-    elif left_state == "var":
-        left_type_object = TypeVariable(left_val)
-
-    right_type_object = None
-
-    if right_state == "val":
-        if right_type == "row_function":
-            right_type_object = right_val.typing
-        else:
-            right_type_object = TypeConst(right_type)
-    elif right_state == "var":
-        right_type_object = TypeVariable(right_val)
+    left_type_object = get_token_type_object(left)
+    right_type_object = get_token_type_object(right)
+    typing = TypeRelation(left_type_object, right_type_object, operation[1])
 
     def expression(row: Row, table: Table) -> ParsedToken:
-        left_final_value = None
-        if left_state == "var":
-            left_final_value = row[table.col_to_index[left_val]]
-        elif left_state == "val":
-            if left_type == "row_function":
-                left_final_value = left_val.function(row, table)
-            else:
-                left_final_value = left_val
-
-        right_final_value = None
-
-        if right_state == "var":
-            right_final_value = row[table.col_to_index[right_val]]
-        elif right_state == "val":
-            if right_type == "row_function":
-                right_final_value = right_val.function(row, table)
-            else:
-                right_final_value = right_val
-
+        left_final_value = get_token_value(left, row, table)
+        right_final_value = get_token_value(right, row, table)
         return operation[0](left_final_value, right_final_value)
 
-    typing = TypeRelation(left_type_object, right_type_object, operation[1])
     return "val", "row_function", TypedFunction(expression, typing)
 
 
@@ -1402,6 +1471,8 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
 
     if head_type == 'function':
         arg_tokens = [parse_miniblock([t]) for t in tokens[1:]]
+        tok_res = [x.get() for x in arg_tokens]
+        tok_val = [x[2] for x in tok_res]
         function = None
 
         if not check_args(head_val, arg_tokens):
@@ -1410,42 +1481,41 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
 
         if head_val == "project":
             function = projection_factory(
-                [cast_to_row_function(x.get()) for x in arg_tokens])
+                [cast_to_row_function(x) for x in tok_res])
 
-        if head_val == "script":
-            script_arguments = []
-            for script_arg in arg_tokens[1:]:
-                script_arguments.append(str(script_arg.get()[2]))
-            function = script_factory(arg_tokens[0].name, script_arguments)
+        elif head_val == "script":
+            function = script_factory(tok_val[0], str_map(tok_val[1:]))
 
-        if head_val == "update":
-            function = update_factory(cast_to_row_function(arg_tokens[0].get()),
-                                      [cast_to_row_function(x.get()) for x in arg_tokens[1:]])
+        elif head_val == "update":
+            function = update_factory(cast_to_row_function(tok_res[0]),
+                                      [cast_to_row_function(x) for x in tok_res[1:]])
 
-        if head_val == "remove":
+        elif head_val == "remove":
             function = remove_factory(
                 cast_to_row_function(arg_tokens[0].get()))
 
         elif head_val == "sort":
-            function = sort_factory([x.name for x in arg_tokens])
+            function = sort_factory(tok_val)
 
         elif head_val == "load":
-            if arg_tokens[0].tag == 'var':
-                function = load_table_factory(db_storage, arg_tokens[0].name)
-            else:
-                print(arg_tokens[0].tag)
+            function = load_table_factory(db_storage, tok_val[0])
+
         elif head_val == "save":
             table_name = None
             if len(arg_tokens) == 1:
-                table_name = arg_tokens[0].name
+                table_name = tok_val[0]
             function = save_table_factory(db_storage, table_name)
+        elif head_val == "drop":
+            table_name = None
+            if len(arg_tokens) == 1:
+                table_name = tok_val[0]
+            function = drop_table_factory(db_storage, table_name)
 
         elif head_val == "create":
             create_cols = []
 
-            for i in range(1, len(arg_tokens)):
+            for package in tok_val[1:]:
                 attribute, key, def_value = None, False, None
-                package = arg_tokens[i].get()[2]
                 if isinstance(package, tuple):
                     attribute = package[0]
                     for i in range(1, len(package)):
@@ -1471,7 +1541,7 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
                 function = insert_factory(
                     lambda x: [[insert_argument.value]])
         elif head_val == "select":
-            function = selection_factory(arg_tokens[0].get()[2])
+            function = selection_factory(tok_val[0])
 
         elif head_val == "print":
             function = print_factory()
@@ -1480,12 +1550,10 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
             function = nothing_factory()
 
         elif head_val == "rename":
-
-            if arg_tokens[0].tag == "var":
-                attribute_names = None
-                if len(arg_tokens) > 1:
-                    attribute_names = [x.name for x in arg_tokens[1:]]
-                function = rename_factory(arg_tokens[0].name, attribute_names)
+            attribute_names = None
+            if len(tok_val) > 1:
+                attribute_names = tok_val[1:]
+            function = rename_factory(tok_val[0], attribute_names)
 
         elif head_val == "join":
             if arg_tokens[0].tag == 'var':
@@ -1495,13 +1563,19 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
                 function = join_factory(
                     arg_tokens[0].name, left, right, condition)
 
+        elif head_val == "cartesian":
+            condition = tok_val[2] if len(tok_val) > 2 else None
+            function = cartesian_factory(tok_val[0], tok_val[1], condition)
+
         if function is None:
             raise RuntimeError("Something went wrong near " + head_val)
 
         return Constant("table_transform", function)
 
     else:
-        raise RuntimeError("Invalid header head " + head_type)
+
+        raise RuntimeError("Invalid header head " + head_type + ". The " +
+                           "tokens were" + str(tokens))
 
 
 def parse_tokens(tokens: List[Token]) -> ExpressionAtom:
@@ -1612,15 +1686,12 @@ def execute_query(query: str, query_args: List[str], type: bool,
                   load: bool, save: bool,
                   ret_original_query: bool = False) -> (
                       Tuple[Optional[Table], Optional[Any]]):
-
     original_query = query
 
     query = subtitute_args(query, query_args)
-
+    ret_query = query if not ret_original_query else original_query
     tokens = tokenize_input(query)
     tree = parse_tokens(tokens)
-
-    ret_query = query if not ret_original_query else original_query
 
     if not type and isinstance(tree, Constant) and tree.val_type in ("table_transform", "fun"):
         function = tree.get()[2]
