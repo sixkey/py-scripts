@@ -107,7 +107,7 @@ If row from the input table satisfies the predicate, its values are updated usin
 
 Removes rows from the input table that satisfy predicate _predicate_ and returns the input table.
 
-### cartesian _table_expr_1_ _table_expr_2_ _predicate_ ?
+### cartesian _table_expr_1_ _table_expr_2_ _predicate_?
 
 _table_expr_1_ and _table_expr_2_ are applied on the input table producing two new tables. These tables have their columns prefixed with their names. Cartesian product is applied on these tables producing the output table that is returned.
 
