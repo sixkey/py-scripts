@@ -126,7 +126,7 @@ Runs the script on the input table and returns the result.
 Row functions are functions that take _row_ and _table_ and return single. Let us imagine we have the following query:
 
 ```
-"create nats n[int] >> insert 0 >> insert 1 >> insert 2 >> insert 3"
+create nats n[int] >> insert 0 >> insert 1 >> insert 2 >> insert 3
 ```
 
 that results in the following table:
