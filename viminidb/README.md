@@ -251,3 +251,77 @@ will result in
 Note that the |str is important as it is not a simple text replacement. If you only replaced @1 with hello, it will be taken as an attribute name and not a value. Thus it will not be compatible with the insert function. The |str inserts '' around your input.
 
 Parameters of course work also with scripts note that if you use a script, the very first argument is already an additional argument (normally, the first argument is the query)
+
+## Some sample queries
+
+The query
+
+```
+create doxx (id[int], 'key', '%') name[str] nick[str] uni[str] >>
+print >>
+insert ('Bruce Wayne', 'Batman', 'dc') >>
+insert ('Clark Kent', 'Superman', 'dc') >>
+insert ('Peter Parker', 'Spiderman', 'marvel') >>
+print >>
+select (uni == 'dc') >>
+print >>
+project nick >>
+print >>
+rename res name
+```
+
+results in
+
+```
+         doxx
+┌─────┬─────┬─────┬─────┐
+│id   │name │nick │uni  │
+│[int]│[str]│[str]│[str]│
+└═════┴═════┴═════┴═════┘
+
+
+               doxx
+┌─────┬────────────┬─────────┬──────┐
+│id   │name        │nick     │uni   │
+│[int]│[str]       │[str]    │[str] │
+╞═════╪════════════╪═════════╪══════╡
+│0    │Bruce Wayne │Batman   │dc    │
+├─────┼────────────┼─────────┼──────┤
+│1    │Clark Kent  │Superman │dc    │
+├─────┼────────────┼─────────┼──────┤
+│2    │Peter Parker│Spiderman│marvel│
+└─────┴────────────┴─────────┴──────┘
+
+
+        selection_table
+┌─────┬───────────┬────────┬─────┐
+│id   │name       │nick    │uni  │
+│[int]│[str]      │[str]   │[str]│
+╞═════╪═══════════╪════════╪═════╡
+│0    │Bruce Wayne│Batman  │dc   │
+├─────┼───────────┼────────┼─────┤
+│1    │Clark Kent │Superman│dc   │
+└─────┴───────────┴────────┴─────┘
+
+
+projection_table
+┌────────┐
+│col_0   │
+│[str]   │
+╞════════╡
+│Batman  │
+├────────┤
+│Superman│
+└────────┘
+
+
+  res
+┌────────┐
+│name    │
+│[str]   │
+╞════════╡
+│Batman  │
+├────────┤
+│Superman│
+└────────┘
+```
