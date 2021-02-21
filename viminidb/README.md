@@ -101,7 +101,7 @@ Inserts the tuple into the input table and returns it.
 
 ### update _predicate_ _row_fun_1_ _row_fun_2_ ...
 
-If row from the input table satisfies the predicate, its values are updated using the row functions so that _i_-th value of the new tuple is the result of applying _row_fun_i_ on the old row.
+If a row from the input table satisfies the predicate, its values are updated using the row functions so that _i_-th value of the new tuple is the result of applying _row_fun_i_ on the old row.
 
 ### remove _predicate_
 
@@ -204,13 +204,15 @@ If you run any query using -rs _script_name_ that query will be and save with th
 viminidb -rs "hello_world" "create helloworld lines[str] >> insert 'hello' >> insert 'world'"
 ```
 
-The script will be saved as hello_world.mndb in the scripts folder
+The script will be saved as hello_world.mndb in the scripts folder.
+
+Running
 
 ```
 viminidb -us "hello_world"
 ```
 
-will result in
+will result in as it runs the recorded script from before.
 
 ```
 ┌─────┐
@@ -225,12 +227,12 @@ will result in
 
 ## Queries with parameters
 
-Positional arguments that are given to viminidb after the query will be taken as arguments. You can catch these arguments using $n or $n|type$ where n is the position of the argument (indexing from 1).
+Positional arguments that are given to viminidb after the query will be taken as arguments belonging to the query. You can catch these arguments using $n or $n|type$ where n is the position of the argument (indexing from 1).
 
 Running
 
 ```
-viminidb -rs "hello_world" "create helloworld lines[str] >> insert @1|str@ >> insert @2|str@" hello world
+viminidb "hello_world" "create helloworld lines[str] >> insert @1|str@ >> insert @2|str@" hello world
 ```
 
 will result in
