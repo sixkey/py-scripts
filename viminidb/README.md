@@ -29,7 +29,7 @@ Tables are stored in .viminidbstorage/tables. They are simple csv files with ';'
 
 ### Scripts
 
-Scripts are stored as mndb files and contain only plain text.
+Scripts are stored as mndb files and contain only plain text representing the query (new lines are connected using (>>)).
 
 ## Domains
 
@@ -47,15 +47,15 @@ Each viminidb query is an array of commands linked either using (.) or (>>).
 
 ### after operator (.)
 
-Links functions "from the right to the left", meaning expression on the right is executed first, and its result is forwarded to the function on the left.
+Links functions "from the right to the left", meaning that `a . b` is like doing `a(b(table))`.
 
 ### then operator (>>)
 
-Links function in intuitive order (from left to right). First, the expression on the left is executed, its result is then forwarded to the function on the right.
+Links function in intuitive order (from left to right), meaning that `a >> b` is like doing `b(a(table))`.
 
 ## Different functions
 
-The first important note is that every function has one hidden argument, a table. Meaning every function expression results in a function that takes a table and produces another table.
+The first important note is that every function has one hidden argument, a table. Meaning every "function expression" results in a function that takes a table and produces another table.
 
 ### nothing
 
@@ -67,9 +67,12 @@ Throws the input table away, creates a new table with name _table_name_ using th
 
 Column definition can be either very simple only containing the name and type: `name[str]` or complex tuples `(id[int], 'key', '%')`.
 
+If the tuple contains 'key' it is set to part of the primary key.
+If the tuple contains an additional value, it is the default value. If the default value is '%', the number of the row is used as the default value instead.
+
 ### load _table_name_
 
-Throws input table away and loads and returns the table with name _table_name_
+Throws input table away and loads and returns the table with name _table_name_.
 
 ### save _table_name_?
 
@@ -77,7 +80,7 @@ Saves the input table to the storage and returns it. If the table name is provid
 
 ### drop _table_name_?
 
-If a table name is provided, drops the table with said name, otherwise drops the input table, either-way returns None.
+If the _table_name_ is provided, drops the table with said name, otherwise drops the input table, either-way returns None.
 
 ### rename _table_name_ _col_1_name_ _col_2_name_ ...
 
@@ -109,7 +112,7 @@ Removes rows from the input table that satisfy predicate _predicate_ and returns
 
 ### cartesian _table_expr_1_ _table_expr_2_ _predicate_?
 
-_table_expr_1_ and _table_expr_2_ are applied on the input table producing two new tables. These tables have their columns prefixed with their names. Cartesian product is applied on these tables producing the output table that is returned.
+_table_expr_1_ and _table_expr_2_ are applied on the input table producing two new tables. These tables have their column names prefixed with their names. Cartesian product is applied on these tables producing the output table, which is finally returned.
 
 (The predicate is used during the product to limit the number of combinations)
 
@@ -123,7 +126,7 @@ Runs the script on the input table and returns the result.
 
 ## Row functions and predicates
 
-Row functions are functions that take _row_ and _table_ and return single. Let us imagine we have the following query:
+Row functions are functions that take _row_ and _table_ and return a single value. They are basically expressions that result in one value and contain constants, operators, and variables. The variables in these functions can be only the names of columns of the table the function is applied on. Let us imagine we have the following query:
 
 ```
 create nats n[int] >> insert 0 >> insert 1 >> insert 2 >> insert 3
@@ -192,19 +195,17 @@ vimindb currently supports following operators:
 
 ## Scripting system
 
-Any query as a plain text saved as .mndb in the scripts folder can be run using
+Any query as a plain text saved as .mndb in the scripts folder can be run using:
 
 ```
 viminidb -us _script_name_
 ```
 
-If you run any query using -rs _script_name_ that query will be and save with that name
+You can record any query using [-rs _script_name_] flag. The following command will run the script at first, then save it to "hello_world.mndb" in scripts folder.
 
 ```
 viminidb -rs "hello_world" "create helloworld lines[str] >> insert 'hello' >> insert 'world'"
 ```
-
-The script will be saved as hello_world.mndb in the scripts folder.
 
 Running
 
@@ -227,7 +228,7 @@ will result in as it runs the recorded script from before.
 
 ## Queries with parameters
 
-Positional arguments that are given to viminidb after the query will be taken as arguments belonging to the query. You can catch these arguments using $n or $n|type$ where n is the position of the argument (indexing from 1).
+Positional arguments that are given to viminidb after the query will be taken as arguments belonging to the query. You can catch these arguments using `@n` or `@n|type@` where _n_ is the position of the argument (indexing from 1).
 
 Running
 
@@ -248,9 +249,9 @@ will result in
 └─────┘
 ```
 
-Note that the |str is important as it is not a simple text replacement. If you only replaced @1 with hello, it will be taken as an attribute name and not a value. Thus it will not be compatible with the insert function. The |str inserts '' around your input.
+Note that the |str is important as it is not a simple text replacement. If you only replaced @1 with hello, it will be taken as an attribute name and not a value. Thus it will not be compatible with the insert function. The |str inserts quotes around your input.
 
-Parameters of course work also with scripts note that if you use a script, the very first argument is already an additional argument (normally, the first argument is the query)
+Parameters of course work also with scripts note that if you use a script, the very first argument is already an "query argument" (normally, the first argument is the query itself)
 
 ## Some sample queries
 
