@@ -61,25 +61,25 @@ The first important note is that every function has one hidden argument, a table
 
 Does nothing, grabs the input table, and returns it.
 
-### create <table_name> <col_def1> <col_def2> <col_def3> ...
+### create _table_name_ _col_def1_ _col_def2_ _col_def3_ ...
 
-Throws the input table away, creates a new table with name <table_name> using the column definitions.
+Throws the input table away, creates a new table with name _table_name_ using the column definitions.
 
 Column definition can be either very simple only containing the name and type: `name[str]` or complex tuples `(id[int], 'key', '%')`.
 
-### load <table_name>
+### load _table_name_
 
-Throws input table away and loads and returns the table with name <table_name>
+Throws input table away and loads and returns the table with name _table_name_
 
-### save <table_name>?
+### save _table_name_?
 
 Saves the input table to the storage and returns it. If the table name is provided, it is saved under that name, otherwise under its own name.
 
-### drop <table_name>?
+### drop _table_name_?
 
 If a table name is provided, drops the table with said name, otherwise drops the input table, either-way returns None.
 
-### rename <table_name>
+### rename _table_name_
 
 Renames the input table and returns it
 
@@ -87,37 +87,37 @@ Renames the input table and returns it
 
 Prints the table to the terminal and returns it.
 
-### project <row_fun_1> <row_fun_2> ...
+### project _row_fun_1_ _row_fun_2_ ...
 
-Returns a new table where every row is mapped to a new tuple, so that _i_-th value is the result of <row_fun_i> being applied on the said row. The columns have names col_i.
+Returns a new table where every row is mapped to a new tuple, so that _i_-th value is the result of _row_fun_i_ being applied on the said row. The columns have names col_i.
 
-### select <predicate>
+### select _predicate_
 
-Returns a new table with the same columns as the input table but only copies the rows that satisfy predicate <predicate> (Meaning applying <predicate> on row produces True).
+Returns a new table with the same columns as the input table but only copies the rows that satisfy predicate _predicate_ (Meaning applying _predicate_ on row produces True).
 
-### insert <tuple>
+### insert _tuple_
 
 Inserts the tuple into the input table and returns it.
 
-### update <predicate> <row_fun_1> <row_fun_2> ...
+### update _predicate_ _row_fun_1_ _row_fun_2_ ...
 
-If row from the input table satisfies the predicate, its values are updated using the row functions so that _i_-th value of the new tuple is the result of applying <row_fun_i> on the old row.
+If row from the input table satisfies the predicate, its values are updated using the row functions so that _i_-th value of the new tuple is the result of applying _row_fun_i_ on the old row.
 
-### remove <predicate>
+### remove _predicate_
 
-Removes rows from the input table that satisfy predicate <predicate> and returns the input table.
+Removes rows from the input table that satisfy predicate _predicate_ and returns the input table.
 
-### cartesian <table_expr_1> <table_expr_2> <predicate> ?
+### cartesian _table_expr_1_ _table_expr_2_ _predicate_ ?
 
-<table_expr_1> and <table_expr_2> are applied on the input table producing two new tables. These tables have their columns prefixed with their names. Cartesian product is applied on these tables producing the output table that is returned.
+_table_expr_1_ and _table_expr_2_ are applied on the input table producing two new tables. These tables have their columns prefixed with their names. Cartesian product is applied on these tables producing the output table that is returned.
 
 (The predicate is used during the product to limit the number of combinations)
 
-### sort <col_name_1> <col_name_2> <col_name_3> ...
+### sort _col_name_1_ _col_name_2_ _col_name_3_ ...
 
 Sorts the input table lexicographically on the columns from arguments and returns it.
 
-### script <script_name>
+### script _script_name_
 
 Runs the script on the input table and returns the result.
 
