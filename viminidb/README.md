@@ -79,9 +79,9 @@ Saves the input table to the storage and returns it. If the table name is provid
 
 If a table name is provided, drops the table with said name, otherwise drops the input table, either-way returns None.
 
-### rename _table_name_
+### rename _table_name_ _col_1_name_ _col_2_name_ ...
 
-Renames the input table and returns it
+Renames the input table and returns it. If column names are provided, then also renames the columns.
 
 ### print
 
