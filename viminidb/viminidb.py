@@ -10,6 +10,7 @@ import re
 import argparse
 import traceback
 import logging
+import textwrap
 from datetime import datetime, date, time
 from collections import deque, defaultdict
 
@@ -75,6 +76,13 @@ def soft_assert(bl: bool, message: str):
     return bl
 
 
+def create_logger(active: bool, current_level: int):
+
+    def log(level: int, *args: List[str], **kwargs):
+        if active and level >= current_level:
+            print(*args, **kwargs)
+    return log
+
 # --------------- STR MANIPULATION
 
 
@@ -126,7 +134,7 @@ def rpad(string: str, size: int, char: str = " ") -> str:
 def mlrow_to_slrows(strings: List[str]) -> List[List[str]]:
     cols_split = [s.splitlines() for s in strings]
     rows_size = [len(x) for x in cols_split]
-    rows = [([0] * len(strings))
+    rows = [([""] * len(strings))
             for i in range(max(rows_size))]
     for index_col, col_string in enumerate(cols_split):
         for index_row, row in enumerate(col_string):
@@ -203,9 +211,9 @@ class TypeMask:
         self.type_vars = {}
 
         if (not resolve_type_in_context(self.type_vars, left) or
-                    not resolve_type_in_context(self.type_vars, right) or
-                    not resolve_type_in_context(self.type_vars, output)
-                ):
+                not resolve_type_in_context(self.type_vars, right) or
+                not resolve_type_in_context(self.type_vars, output)
+            ):
             raise RuntimeError(f"Invalid mask type: {str(self)}")
 
     def check(self, actual_left: str, actual_right: str) -> Optional[str]:
@@ -578,8 +586,12 @@ class Table:
         self.id_counter = 0
         self.primary_index = TableIndex()
 
-    def copy_table(self) -> 'Table':
-        return Table(self.name + "_copy", [x.copy() for x in self.cols])
+    def copy_table(self, copy_content: bool = False) -> 'Table':
+        final_table = Table(self.name + "_copy", [x.copy() for x in self.cols])
+        if copy_content:
+            for row in self.rows:
+                final_table.add_row(row)
+        return final_table
 
     # COLS
 
@@ -600,6 +612,9 @@ class Table:
         if old_name in self.keys:
             self.keys.remove(old_name)
             self.keys.add(new_name)
+
+    def get_col_names(self):
+        return set([x.get_name() for x in self.cols])
 
     # KEYS
 
@@ -650,7 +665,7 @@ class Table:
         row_key = self.get_row_key(casted_row)
 
         if self.key_already_present(row_key):
-            raise ValueError("Key already present")
+            raise ValueError(f"Key error: {row_key} already in {self.name}")
 
         self.rows.append(casted_row)
         self.update_key(row_key)
@@ -727,7 +742,8 @@ class Table:
         cur_str_row = [f"{x.get_name()}\n[{x.get_type()}]" for x in self.cols]
         str_rows.append(cur_str_row)
         for row in self.rows:
-            cur_str_row = [str(x) for x in row]
+            cur_str_row = ["\n".join(textwrap.wrap(
+                str(x), 24, break_long_words=True)) for x in row]
             str_rows.append(cur_str_row)
 
         total_rows = [mlrow_to_slrows(x) for x in str_rows]
@@ -794,7 +810,7 @@ def create_def_cols(attributes: List[Attribute]) -> List[ColDefinition]:
 def load_table_from(file_path: str) -> Table:
     with open(file_path, "r", encoding="utf-8") as f:
 
-        [table_name, col_count] = next(f).strip().split(";")
+        [table_name, col_count, id_counter] = next(f).strip().split(";")
 
         col_defs = []
 
@@ -812,12 +828,15 @@ def load_table_from(file_path: str) -> Table:
             row_values = row.strip().split(";")
             table.add_row(tuple(row_values))
 
+        table.id_counter = int(id_counter)
+
         return table
 
 
 def write_table_to(table: Table, file_path: str) -> None:
     with open(file_path, "w", encoding="utf-8") as f:
-        f.write(table.name + ";" + str(len(table.col_to_index)) + "\n")
+        f.write(table.name + ";" + str(len(table.cols)) + ";" +
+                str(table.id_counter) + "\n")
 
         for col in table.cols:
             attribute, key, def_value = col.attribute, col.is_key, col.default_value
@@ -833,7 +852,7 @@ def delete_table(file_path: str) -> None:
     os.remove(file_path)
 
 
-def list_tables(storage_path: str) -> List[str]:
+def list_files(storage_path: str) -> List[str]:
 
     res = []
 
@@ -970,12 +989,12 @@ def remove_factory(condition: TypedFunction):
     return remove
 
 
-def rename_factory(name: str, attributes: Optional[List[str]]) -> TableAction:
+def rename_factory(name: Optional[str], attributes: Optional[List[str]]) -> TableAction:
     def rename(table: Table) -> Table:
-        if name:
+        if name is not None:
             table.name = name
 
-        if attributes:
+        if attributes is not None:
             for index, attribute in enumerate(attributes):
                 table.rename_col(index, attribute)
 
@@ -994,69 +1013,96 @@ def insert_factory(function: TableFunction) -> TableAction:
     return insert
 
 
-def join_factory(type: str, left: TableAction, right: TableAction, condition) -> TableAction:
-    def join(table: Table) -> Table:
-        left_table = left(table)
-        right_table = right(table)
-
-        final_table = None
-
-        if condition:
-            raise RuntimeError("Condition is not yet supported")
-
-        same_attributes = []
-        final_attributes = left_table.cols[:]
-
-        right_indexes = []
-        for r_attribute in right_table.attributes:
-            if r_attribute.name in left_table.col_to_index:
-                same_attributes.append(r_attribute)
-            else:
-                right_indexes.append(
-                    right_table.col_to_index[r_attribute.name])
-                final_attributes.append(r_attribute)
-
-        def final_transformer(left: Row, right: Row):
-            return tuple(list(left) + [right[index] for index in right_indexes])
-
-        final_table = Table(
-            "joined_table", create_def_cols(final_attributes))
-
-        for l_row in left_table.rows:
-            for r_row in right_table.rows:
-                add = True
-                for attr in same_attributes:
-                    if l_row[left_table.col_to_index[attr.name]] != r_row[right_table.col_to_index[attr.name]]:
-                        add = False
-                        break
-                if add:
-                    final_table.add_row(final_transformer(l_row, r_row))
-
-        return final_table
-
-    return join
-
-
-def table_prefix_attributes(table: Table):
+def table_prefix_attributes(table: Table, prefix: str = None):
+    if prefix is None:
+        prefix = table.name
     for i, col in enumerate(table.cols):
-        table.rename_col(i, table.name + "_" + col.get_name())
+        table.rename_col(i, prefix + "_" + col.get_name())
     return table
 
 
-def cartesian_factory(left: TableAction, right: TableAction, condition: TypedFunction = None) -> TableAction:
-    def cartesian(table: Table):
-        left_table = table_prefix_attributes(left(table))
-        right_table = table_prefix_attributes(right(table))
+def cartesian_product(left_table: Table, right_table: Table,
+                      condition: TypedFunction = None):
 
-        new_cols = left_table.cols + right_table.cols
-        final_table = Table("cartesian_product", new_cols)
+    l_col_names = left_table.get_col_names()
+    r_col_names = right_table.get_col_names()
 
-        for left_row in left_table.rows:
-            for right_row in right_table.rows:
-                new_row = tuple(list(left_row) + list(right_row))
-                if not condition or condition.function(new_row, final_table):
-                    final_table.add_row(new_row)
+    if l_col_names.intersection(r_col_names):
+        soft_assert(False, "There are two columns with the same name")
+
+    new_cols = left_table.cols + right_table.cols
+
+    new_cols = [x.copy() for x in new_cols]
+    for col in new_cols:
+        col.is_key = False
+        col.default_value = None
+
+    final_table = Table("cartesian_product", new_cols)
+
+    for left_row in left_table.rows:
+        for right_row in right_table.rows:
+            new_row = tuple(list(left_row) + list(right_row))
+            if condition is None or condition.function(new_row, final_table):
+                final_table.add_row(new_row)
+    return final_table
+
+
+def join_factory(join_type: str, left: TableAction, right: TableAction, condition) -> TableAction:
+
+    soft_assert(join_type == 'in', "Join only supports inner join at " +
+                "this time")
+
+    def join(table: Table) -> Table:
+
+        left_table = left(table)
+        right_table = right(table.copy_table(True))
+
+        l_col_names = left_table.get_col_names()
+        r_col_names = right_table.get_col_names()
+
+        same_cols = l_col_names.intersection(r_col_names)
+
+        left_table = table_prefix_attributes(left_table, "L")
+        right_table = table_prefix_attributes(right_table, "R")
+
+        def condition(row: Row, table: Table):
+            for col_name in same_cols:
+                l_value = row[table.col_to_index["L_" + col_name]]
+                r_value = row[table.col_to_index["R_" + col_name]]
+                if l_value != r_value:
+                    return False
+            return True
+
+        final_table = cartesian_product(
+            left_table, right_table, TypedFunction(condition, None))
+
+        cols_for_removal = set(["R_" + x for x in same_cols])
+        final_cols = [x.get_name() for x in final_table.cols]
+        final_cols = [x for x in final_cols if x not in cols_for_removal]
+
+        row_functions = [cast_to_row_function(
+            ("var", "any", x)) for x in final_cols]
+
+        final_table = projection_factory(row_functions)(final_table)
+
+        final_cols = [x[2:] for x in final_cols]
+        final_table = rename_factory(None, final_cols)(final_table)
+
         return final_table
+    return join
+
+
+def cartesian_factory(left: TableAction, right: TableAction,
+                      condition: TypedFunction = None) -> TableAction:
+    def cartesian(table: Table):
+        left_table = left(table)
+        right_table = right(table.copy_table(True))
+
+        if left_table.name == right_table.name:
+            left_table.name = left_table.name + "_1"
+            left_table.name = left_table.name + "_2"
+
+        cartesian_product(left_table, right_table, condition)
     return cartesian
 
 
@@ -1625,8 +1671,11 @@ def get_args() -> Args:
     parser = argparse.ArgumentParser(
         description="Execute commands on database")
 
-    parser.add_argument('-ls', '--list', action="store_const", const=True,
+    parser.add_argument('-l', '--list', action="store_const", const=True,
                         help="If set lists present tables")
+
+    parser.add_argument('-ls', '--list_scripts', action="store_const", const=True,
+                        help="If set lists present scripts")
 
     parser.add_argument('-s', '--session', action="store_const", const=True,
                         help="If set starts session")
@@ -1648,11 +1697,16 @@ def get_args() -> Args:
     group.add_argument('-us', '--use_script', type=str,
                        help="If set uses script with the query name")
 
+    group.add_argument('-ps', '--print_script', type=str,
+                       help="If set uses script with the query name")
+
     parser.add_argument('--rec_raw', action='store_const', const='True',
                         help="If set, records @ arguments.")
 
-    parser.add_argument('-v', '--verbose', action='store_const', const='True',
-                        help="If set, shows debbuging information")
+    parser.add_argument('-v', '--verbose', type=int,
+                        help="Sets the level treshold of information level, " +
+                             "the higher the level, the lower amount of info" +
+                             " you get.")
 
     parser.add_argument('main_args', nargs="*",
                         type=str, help="the main input")
@@ -1671,9 +1725,14 @@ def subtitute_args(query: str, query_args: List[str]):
             query = re.sub(r"@" + str(i + 1) + r"\|(\w+)@", arg, query)
             continue
 
-        match = re.search(r"@" + str(i + 1) + r"([\D$])", query)
+        match = re.search(r"@" + str(i + 1) + r"(\D)", query)
         if match:
-            query = re.sub(r"@" + str(i + 1) + r"([\D$])", arg + r"\1", query)
+            query = re.sub(r"@" + str(i + 1) + r"(\D)", arg + r"\1", query)
+            continue
+
+        match = re.search(r"@" + str(i + 1) + r"$", query)
+        if match:
+            query = re.sub(r"@" + str(i + 1) + r"$", arg, query)
             continue
 
     return query
@@ -1690,7 +1749,10 @@ def execute_query(query: str, query_args: List[str], type: bool,
 
     query = subtitute_args(query, query_args)
     ret_query = query if not ret_original_query else original_query
+
+    log(2, f"Executing query:", {query})
     tokens = tokenize_input(query)
+    log(0, f"Parsed tokens:", tokens)
     tree = parse_tokens(tokens)
 
     if not type and isinstance(tree, Constant) and tree.val_type in ("table_transform", "fun"):
@@ -1710,10 +1772,8 @@ def execute_query(query: str, query_args: List[str], type: bool,
 
 def read_script(name: str) -> str:
     with open(get_scripts_storage(name + ".mndb"), "r", encoding="utf-8") as f:
-        lines = []
-        for l in f:
-            lines.append(l)
-        return " . ".join(lines)
+        lines = "".join(f.readlines()).splitlines()
+        return " >> ".join(lines)
 
 
 def save_script(name: str, lines: List[str]) -> None:
@@ -1726,6 +1786,8 @@ if __name__ == "__main__":
 
     storage_path = get_local_storage()
 
+    # CREATING STORAGE
+
     if not os.path.exists(storage_path):
         os.mkdir(storage_path)
 
@@ -1735,13 +1797,28 @@ if __name__ == "__main__":
     if not os.path.exists(get_scripts_storage()):
         os.mkdir(get_scripts_storage())
 
-    if args.verbose:
+    # CREATE LOGGING - VERBOSE
+
+    log = create_logger(args.verbose is not None,
+                        args.verbose if args.verbose is not None else -1)
+
+    if args.verbose is not None and args.verbose == 0:
         tokenize_input = create_louder_function(tokenize_input)
         parse_tokens = create_louder_function(parse_tokens)
         build_row_expression = create_louder_function(build_row_expression)
 
+    # LISTING
+
     if args.list:
-        print(list_tables(get_db_storage()))
+        print(list_files(get_db_storage()))
+
+    if args.list_scripts:
+        print(list_files(get_scripts_storage()))
+
+    # PRINTING SCRIPT
+
+    if args.print_script:
+        print(read_script(args.print_script))
 
     query_history = []
 
@@ -1759,11 +1836,6 @@ if __name__ == "__main__":
 
     if query:
         query_que.append(query)
-
-    if not query_que:
-        user_input = input(">>> ")
-        if user_input:
-            query_que.append(user_input)
 
     while query_que:
         query = query_que.popleft()
