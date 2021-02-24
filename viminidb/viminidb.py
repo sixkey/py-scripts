@@ -11,6 +11,7 @@ import argparse
 import traceback
 import logging
 import textwrap
+import random
 from datetime import datetime, date, time
 from collections import deque, defaultdict
 
@@ -44,6 +45,11 @@ def dateformat_to_regex(string: str) -> str:
 
     return string
 
+
+GLOBAL_CONSTS = {
+    "PI": 3.14,
+    "NOW": "'" + datetime.today().strftime('%Y-%m-%d %H:%M:%S') + "'",
+}
 
 DATE_FORMATS = [(x, dateformat_to_regex(x)) for x in [
     "%Y-%m-%d %H:%M:%S",
@@ -211,8 +217,8 @@ class TypeMask:
         self.type_vars = {}
 
         if (not resolve_type_in_context(self.type_vars, left) or
-                not resolve_type_in_context(self.type_vars, right) or
-                not resolve_type_in_context(self.type_vars, output)
+            not resolve_type_in_context(self.type_vars, right) or
+            not resolve_type_in_context(self.type_vars, output)
             ):
             raise RuntimeError(f"Invalid mask type: {str(self)}")
 
@@ -284,6 +290,7 @@ TYPE_TREE = {
     "str": ["any"],
     "date": ["any"],
     "datetime": ["any"],
+    "tuple": ["any"]
 }
 
 TYPE_TREE['null'] = [x for x in TYPE_TREE]
@@ -635,7 +642,11 @@ class Table:
     def cast_row(self, row: Row) -> Row:
         res_row = []
         if len(row) != len(self.cols):
-            return None
+            raise ValueError(f"The row doesn't match the cols of table " +
+                             f"{self.name}. The table can't accept: \n" +
+                             f"{row}\nNote that this row has to cover " +
+                             f"every column, no additional information " +
+                             f"will be added.")
 
         for col, row_value in zip(self.cols, row):
 
@@ -1119,12 +1130,20 @@ def nothing_factory() -> TableAction:
     return nothing
 
 
-def sort_factory(attributes: List[str]) -> TableAction:
+def sort_factory(attributes: List[str], sort_type: str = 'asc') -> TableAction:
     def sort(table: Table) -> Table:
         table.rows.sort(key=lambda x: [x[table.col_to_index[attr]]
-                                       for attr in attributes])
+                                       for attr in attributes],
+                        reverse=sort_type != 'asc')
         return table
     return sort
+
+
+def shuffle_factory() -> TableAction:
+    def shuffle(table: Table):
+        random.shuffle(table.rows)
+        return table
+    return shuffle
 
 
 def script_factory(script_name: str, arguments: List[str]) -> TableAction:
@@ -1140,6 +1159,12 @@ def script_factory(script_name: str, arguments: List[str]) -> TableAction:
         return group[0]
     return script
 
+
+def top_factory(count: int) -> TableAction:
+    def top(table: Table) -> Table:
+        table.rows = table.rows[:count]
+        return table
+    return top
 
 # --------------- QUERY PARSING
 
@@ -1239,14 +1264,17 @@ DB_FUNCTIONS_ARITIES = {
     "drop": (0, 1),
     "rename": (1, "*"),
 
+    "shuffle": 0,
     "project": (1, "*"),
     "select": 1,
+    "top": 1,
 
     "insert": 1,
     "remove": 1,
     "update": (1, "*"),
 
     "sort": (1, "*"),
+    "sortd": (1, "*"),
     "cartesian": (2, 3),
     "join": (3, 4),
 
@@ -1347,14 +1375,14 @@ def get_token_value(token: ParsedToken, row: Row, table: Table) -> Optional[Any]
 def build_row_expression(left: ParsedToken, right: ParsedToken, operation: Operation) -> ParsedToken:
     left_state, left_type, left_val = left
     right_state, right_type, right_val = right
-
-    if left_state == "val" and right_state == "val":
-        if left_type != "row_function" and right_type != "row_function":
-            return result_to_val_tuple(operation[0](left_val, right_val))
-
     left_type_object = get_token_type_object(left)
     right_type_object = get_token_type_object(right)
     typing = TypeRelation(left_type_object, right_type_object, operation[1])
+
+    if left_state == "val" and right_state == "val":
+        if left_type != "row_function" and right_type != "row_function":
+            fun = TypedFunction(operation[0], typing)
+            return "val", fun.get_type({}), fun.function(left_val, right_val)
 
     def expression(row: Row, table: Table) -> ParsedToken:
         left_final_value = get_token_value(left, row, table)
@@ -1542,6 +1570,13 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
 
         elif head_val == "sort":
             function = sort_factory(tok_val)
+        elif head_val == "sortd":
+            function = sort_factory(tok_val, 'desc')
+        elif head_val == "shuffle":
+            function = shuffle_factory()
+
+        elif head_val == "top":
+            function = top_factory(tok_val[0])
 
         elif head_val == "load":
             function = load_table_factory(db_storage, tok_val[0])
@@ -1551,6 +1586,7 @@ def parse_miniblock(tokens: List[Token]) -> ExpressionAtom:
             if len(arg_tokens) == 1:
                 table_name = tok_val[0]
             function = save_table_factory(db_storage, table_name)
+
         elif head_val == "drop":
             table_name = None
             if len(arg_tokens) == 1:
@@ -1714,26 +1750,48 @@ def get_args() -> Args:
     return parser.parse_args(sys.argv[1:])
 
 
+def transform_arg(arg: str, arg_type: str):
+    if arg_type == "str":
+        return f"'{arg}'"
+    else:
+        return str(arg)
+
+
+def subtitute_arg(query: str, substring: str, variables: Dict[int, str],
+                  arg_num: int, arg_val: str, arg_type: str):
+    if arg_num in variables:
+        arg_val = variables[arg_num]
+    return query.replace(substring, transform_arg(arg_val, arg_type))
+
+
 def subtitute_args(query: str, query_args: List[str]):
+
+    args_dict: Dict[int, str] = {}
     for i, arg in enumerate(query_args):
-        match = re.search(r"@" + str(i + 1) + r"\|(\w+)@", query)
-        if match:
-            arg_type = match.group(1)
-            if arg_type == 'str':
-                arg = f"'{arg}'"
+        args_dict[i + 1] = arg
 
-            query = re.sub(r"@" + str(i + 1) + r"\|(\w+)@", arg, query)
-            continue
+    for group in re.findall(r"(@(\d+);(\w+);([\S\s]+)@)", query):
+        whole, arg_num, arg_type, arg_val = group
+        query = subtitute_arg(query, whole, args_dict,
+                              int(arg_num), arg_val, arg_type)
+    for group in re.findall(r"(@(\d+);(\w+)@)", query):
+        arg_val = None
+        whole, arg_num, arg_type = group
+        query = subtitute_arg(query, whole, args_dict,
+                              int(arg_num), arg_val, arg_type)
 
-        match = re.search(r"@" + str(i + 1) + r"(\D)", query)
-        if match:
-            query = re.sub(r"@" + str(i + 1) + r"(\D)", arg + r"\1", query)
-            continue
+    for group in re.findall(r"(@(\d+))", query):
+        arg_val = None
+        arg_type = None
+        whole, arg_num = group
+        query = subtitute_arg(query, whole, args_dict,
+                              int(arg_num), arg_val, arg_type)
 
-        match = re.search(r"@" + str(i + 1) + r"$", query)
-        if match:
-            query = re.sub(r"@" + str(i + 1) + r"$", arg, query)
-            continue
+    if "@" in query:
+        RuntimeError(f"There are unresolved variables in query: {query}")
+
+    for key, value in GLOBAL_CONSTS.items():
+        query = query.replace(f"@{key}@", str(value))
 
     return query
 
@@ -1746,7 +1804,6 @@ def execute_query(query: str, query_args: List[str], type: bool,
                   ret_original_query: bool = False) -> (
                       Tuple[Optional[Table], Optional[Any]]):
     original_query = query
-
     query = subtitute_args(query, query_args)
     ret_query = query if not ret_original_query else original_query
 
@@ -1777,8 +1834,13 @@ def read_script(name: str) -> str:
 
 
 def save_script(name: str, lines: List[str]) -> None:
+    final_lines = []
+
+    for line in lines:
+        final_lines += "\n".join([x.strip() for x in line.split(">>")])
+
     with open(get_scripts_storage(name + ".mndb"), "w", encoding="utf-8") as f:
-        f.writelines(lines)
+        f.writelines(final_lines)
 
 
 if __name__ == "__main__":
