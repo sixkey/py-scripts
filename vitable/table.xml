@@ -1,0 +1,672 @@
+<rozvrh>
+<minhod>480</minhod>
+<maxhod>1200</maxhod>
+<hodiny>
+<hodina>
+<od>8:00</od>
+<do>8:50</do>
+</hodina>
+<hodina>
+<od>9:00</od>
+<do>9:50</do>
+</hodina>
+<hodina>
+<od>10:00</od>
+<do>10:50</do>
+</hodina>
+<hodina>
+<od>11:00</od>
+<do>11:50</do>
+</hodina>
+<hodina>
+<od>12:00</od>
+<do>12:50</do>
+</hodina>
+<hodina>
+<od>13:00</od>
+<do>13:50</do>
+</hodina>
+<hodina>
+<od>14:00</od>
+<do>14:50</do>
+</hodina>
+<hodina>
+<od>15:00</od>
+<do>15:50</do>
+</hodina>
+<hodina>
+<od>16:00</od>
+<do>16:50</do>
+</hodina>
+<hodina>
+<od>17:00</od>
+<do>17:50</do>
+</hodina>
+<hodina>
+<od>18:00</od>
+<do>18:50</do>
+</hodina>
+<hodina>
+<od>19:00</od>
+<do>19:50</do>
+</hodina>
+</hodiny>
+<tabulka>
+<den id="Po 1. 3." rows="2">
+<radek num="1">
+<slot pdiff="16" diff="24" odcas="08:00" docas="09:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>MB151/01</kod>
+<nazev>Lineární modely</nazev>
+<predmetid>1323783</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>3868</ucitelid>
+<uciteljmeno>O. Klíma</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="10:00" docas="11:00"/>
+<break pdiff="8" diff="12" odcas="11:00" docas="12:00"/>
+<slot pdiff="16" diff="24" odcas="12:00" docas="13:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PB071</kod>
+<nazev>Principy nízkoúr. prog.</nazev>
+<predmetid>1323838</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>4085</ucitelid>
+<uciteljmeno>P. Švenda</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="14:00" docas="15:00"/>
+<break pdiff="8" diff="12" odcas="15:00" docas="16:00"/>
+<slot pdiff="16" diff="24" odcas="16:00" docas="17:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IB002/03</kod>
+<nazev>Algoritmy a datové struktury</nazev>
+<predmetid>1323745</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>72525</ucitelid>
+<uciteljmeno>N. Beneš</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+<radek num="2">
+<break pdiff="8" diff="12" odcas="8:00" docas="9:00"/>
+<break pdiff="8" diff="12" odcas="9:00" docas="10:00"/>
+<break pdiff="8" diff="12" odcas="10:00" docas="11:00"/>
+<break pdiff="8" diff="12" odcas="11:00" docas="12:00"/>
+<break pdiff="8" diff="12" odcas="12:00" docas="13:00"/>
+<slot pdiff="8" diff="12" odcas="13:00" docas="14:00">
+<mistnosti>
+<mistnost>
+<mistnostozn/>
+<mistnostid/>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PB071</kod>
+<nazev>Principy nízkoúr. prog.</nazev>
+<predmetid>1323838</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+<eucebna_url>https://cesnet.zoom.us/j/91788936321?pwd=QncwWlBxSFd4RHZoT2NMOGxsSVptdz09</eucebna_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>4085</ucitelid>
+<uciteljmeno>P. Švenda</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="14:00" docas="15:00"/>
+<break pdiff="8" diff="12" odcas="15:00" docas="16:00"/>
+<slot pdiff="16" diff="24" odcas="16:00" docas="17:50">
+<mistnosti>
+<mistnost>
+<mistnostozn/>
+<mistnostid/>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IB002/03</kod>
+<nazev>Algoritmy a datové struktury</nazev>
+<predmetid>1323745</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+<eucebna_url>https://cesnet.zoom.us/j/95935917912?pwd=UHFLRHh2WHhib0pvb1lGVGpFMWhwZz09</eucebna_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>72525</ucitelid>
+<uciteljmeno>N. Beneš</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+</den>
+<den id="Út 2. 3." rows="2">
+<radek num="1">
+<break pdiff="8" diff="12" odcas="8:00" docas="9:00"/>
+<break pdiff="8" diff="12" odcas="9:00" docas="10:00"/>
+<break pdiff="8" diff="12" odcas="10:00" docas="11:00"/>
+<break pdiff="8" diff="12" odcas="11:00" docas="12:00"/>
+<break pdiff="8" diff="12" odcas="12:00" docas="13:00"/>
+<break pdiff="8" diff="12" odcas="13:00" docas="14:00"/>
+<slot pdiff="16" diff="24" odcas="14:00" docas="15:50">
+<mistnosti>
+<mistnost>
+<mistnostozn/>
+<mistnostid/>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IB002</kod>
+<nazev>Algoritmy a datové struktury</nazev>
+<predmetid>1323745</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+<eucebna_url>https://meet.google.com/rbk-vugq-exh</eucebna_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>469371</ucitelid>
+<uciteljmeno>M. Žáček</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="16:00" docas="17:00"/>
+<break pdiff="8" diff="12" odcas="17:00" docas="18:00"/>
+<slot pdiff="16" diff="24" odcas="18:00" docas="19:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>MB151</kod>
+<nazev>Lineární modely</nazev>
+<predmetid>1323783</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>3868</ucitelid>
+<uciteljmeno>O. Klíma</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+</radek>
+<radek num="2">
+<break pdiff="8" diff="12" odcas="8:00" docas="9:00"/>
+<break pdiff="8" diff="12" odcas="9:00" docas="10:00"/>
+<break pdiff="8" diff="12" odcas="10:00" docas="11:00"/>
+<break pdiff="8" diff="12" odcas="11:00" docas="12:00"/>
+<break pdiff="8" diff="12" odcas="12:00" docas="13:00"/>
+<break pdiff="8" diff="12" odcas="13:00" docas="14:00"/>
+<slot pdiff="16" diff="24" odcas="14:00" docas="15:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>VB036/23</kod>
+<nazev>English II</nazev>
+<predmetid>1323951</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>115421</ucitelid>
+<uciteljmeno>Z. Vašíčková</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="16:00" docas="17:00"/>
+<break pdiff="8" diff="12" odcas="17:00" docas="18:00"/>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+</den>
+<den id="St 3. 3." rows="3">
+<radek num="1">
+<slot pdiff="16" diff="24" odcas="08:00" docas="09:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IB016</kod>
+<nazev>Seminář z funkc. programování</nazev>
+<predmetid>1323748</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>456357</ucitelid>
+<uciteljmeno>V. Chlup</uciteljmeno>
+</ucitel>
+<ucitel>
+<ucitelid>445763</ucitelid>
+<uciteljmeno>A. Matoušek</uciteljmeno>
+</ucitel>
+<ucitel>
+<ucitelid>373979</ucitelid>
+<uciteljmeno>V. Štill</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<slot pdiff="16" diff="24" odcas="10:00" docas="11:50">
+<mistnosti>
+<mistnost>
+<mistnostozn/>
+<mistnostid/>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IB002</kod>
+<nazev>Algoritmy a datové struktury</nazev>
+<predmetid>1323745</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+<eucebna_url>https://cesnet.zoom.us/j/92237969376</eucebna_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>445326</ucitelid>
+<uciteljmeno>J. Horáček</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<slot pdiff="16" diff="24" odcas="12:00" docas="13:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IB002</kod>
+<nazev>Algoritmy a datové struktury</nazev>
+<predmetid>1323745</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>1419</ucitelid>
+<uciteljmeno>I. Černá</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<slot pdiff="16" diff="24" odcas="14:00" docas="15:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PB162</kod>
+<nazev>Programování Java</nazev>
+<predmetid>1323846</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>94</ucitelid>
+<uciteljmeno>T. Pitner</uciteljmeno>
+</ucitel>
+<ucitel>
+<ucitelid>3636</ucitelid>
+<uciteljmeno>R. Ošlejšek</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<slot pdiff="16" diff="24" odcas="16:00" docas="17:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PB071/08</kod>
+<nazev>Principy nízkoúr. prog.</nazev>
+<predmetid>1323838</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>485601</ucitelid>
+<uciteljmeno>T. Krchňák</uciteljmeno>
+</ucitel>
+<ucitel>
+<ucitelid>396157</ucitelid>
+<uciteljmeno>R. Lacko</uciteljmeno>
+</ucitel>
+<ucitel>
+<ucitelid>492914</ucitelid>
+<uciteljmeno>J. Marcin</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+<radek num="2">
+<break pdiff="7" diff="11" odcas="8:00" docas="8:55"/>
+<slot pdiff="8" diff="13" odcas="08:55" docas="10:00">
+<mistnosti>
+<mistnost>
+<mistnostozn/>
+<mistnostid/>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IB016</kod>
+<nazev>Seminář z funkc. programování</nazev>
+<predmetid>1323748</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+<eucebna_url>/auth/e-ucebna/006970/FI-IB016-Seminar-z-funkc/</eucebna_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>445763</ucitelid>
+<uciteljmeno>A. Matoušek</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="10:00" docas="11:00"/>
+<break pdiff="8" diff="12" odcas="11:00" docas="12:00"/>
+<slot pdiff="16" diff="24" odcas="12:00" docas="13:50">
+<mistnosti>
+<mistnost>
+<mistnostozn/>
+<mistnostid/>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IB002</kod>
+<nazev>Algoritmy a datové struktury</nazev>
+<predmetid>1323745</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+<eucebna_url>https://cesnet.zoom.us/j/91556343740?pwd=TEYrL2RBMW9ZMGhoSVIzQ3owbEtDQT09</eucebna_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>1419</ucitelid>
+<uciteljmeno>I. Černá</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="14:00" docas="15:00"/>
+<break pdiff="8" diff="12" odcas="15:00" docas="16:00"/>
+<break pdiff="8" diff="12" odcas="16:00" docas="17:00"/>
+<break pdiff="8" diff="12" odcas="17:00" docas="18:00"/>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+<radek num="3">
+<break pdiff="8" diff="12" odcas="8:00" docas="9:00"/>
+<break pdiff="8" diff="12" odcas="9:00" docas="10:00"/>
+<break pdiff="8" diff="12" odcas="10:00" docas="11:00"/>
+<break pdiff="8" diff="12" odcas="11:00" docas="12:00"/>
+<slot pdiff="16" diff="24" odcas="12:00" docas="13:50">
+<mistnosti>
+<mistnost>
+<mistnostozn/>
+<mistnostid/>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>IV119</kod>
+<nazev>Seminar on Discrete Methods</nazev>
+<predmetid>1323768</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+<eucebna_url>https://cesnet.zoom.us/j/95448826893?pwd=V1FyZzgyall0VmRzRFJuZ2V0eUxxQT09</eucebna_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>168881</ucitelid>
+<uciteljmeno>P. Hliněný</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="14:00" docas="15:00"/>
+<break pdiff="8" diff="12" odcas="15:00" docas="16:00"/>
+<break pdiff="8" diff="12" odcas="16:00" docas="17:00"/>
+<break pdiff="8" diff="12" odcas="17:00" docas="18:00"/>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+</den>
+<den id="Čt 4. 3." rows="1">
+<radek num="1">
+<break pdiff="8" diff="12" odcas="8:00" docas="9:00"/>
+<break pdiff="8" diff="12" odcas="9:00" docas="10:00"/>
+<break pdiff="8" diff="12" odcas="10:00" docas="11:00"/>
+<break pdiff="8" diff="12" odcas="11:00" docas="12:00"/>
+<slot pdiff="16" diff="24" odcas="12:00" docas="13:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PV004</kod>
+<nazev>UNIX</nazev>
+<predmetid>1323853</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>2116</ucitelid>
+<uciteljmeno>M. Brandejs</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="14:00" docas="15:00"/>
+<break pdiff="8" diff="12" odcas="15:00" docas="16:00"/>
+<slot pdiff="16" diff="24" odcas="16:00" docas="17:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PB156</kod>
+<nazev>Počítačové sítě</nazev>
+<predmetid>1323843</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>2053</ucitelid>
+<uciteljmeno>E. Hladká</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+</den>
+<den id="Pá 5. 3." rows="2">
+<radek num="1">
+<slot pdiff="16" diff="24" odcas="08:00" docas="09:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PB152</kod>
+<nazev>Operační systémy</nazev>
+<predmetid>1323840</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>139761</ucitelid>
+<uciteljmeno>P. Ročkai</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<slot pdiff="16" diff="24" odcas="10:00" docas="11:50">
+<mistnosti>
+<mistnost>
+<mistnostozn>Virtuální místnost</mistnostozn>
+<mistnostid>13909</mistnostid>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PB162/01</kod>
+<nazev>Programování Java</nazev>
+<predmetid>1323846</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>445343</ucitelid>
+<uciteljmeno>B. Jaduš</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="12:00" docas="13:00"/>
+<break pdiff="8" diff="12" odcas="13:00" docas="14:00"/>
+<break pdiff="8" diff="12" odcas="14:00" docas="15:00"/>
+<break pdiff="8" diff="12" odcas="15:00" docas="16:00"/>
+<break pdiff="8" diff="12" odcas="16:00" docas="17:00"/>
+<break pdiff="8" diff="12" odcas="17:00" docas="18:00"/>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+<radek num="2">
+<break pdiff="8" diff="12" odcas="8:00" docas="9:00"/>
+<break pdiff="8" diff="12" odcas="9:00" docas="10:00"/>
+<slot pdiff="16" diff="24" odcas="10:00" docas="11:50">
+<mistnosti>
+<mistnost>
+<mistnostozn/>
+<mistnostid/>
+</mistnost>
+</mistnosti>
+<akce>
+<kod>PB162/01</kod>
+<nazev>Programování Java</nazev>
+<predmetid>1323846</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+<eucebna_url>https://cesnet.zoom.us/j/98444117107</eucebna_url>
+</akce>
+<ucitele>
+<ucitel>
+<ucitelid>445343</ucitelid>
+<uciteljmeno>B. Jaduš</uciteljmeno>
+</ucitel>
+</ucitele>
+</slot>
+<break pdiff="8" diff="12" odcas="12:00" docas="13:00"/>
+<break pdiff="8" diff="12" odcas="13:00" docas="14:00"/>
+<break pdiff="8" diff="12" odcas="14:00" docas="15:00"/>
+<break pdiff="8" diff="12" odcas="15:00" docas="16:00"/>
+<break pdiff="8" diff="12" odcas="16:00" docas="17:00"/>
+<break pdiff="8" diff="12" odcas="17:00" docas="18:00"/>
+<break pdiff="8" diff="12" odcas="18:00" docas="19:00"/>
+<break pdiff="8" diff="12" odcas="19:00" docas="20:00"/>
+</radek>
+</den>
+</tabulka>
+<nezname>
+<akce>
+<kod>IB016/virtual</kod>
+<nazev>Seminář z funkcionálního programování</nazev>
+<predmetid>1323748</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<akce>
+<kod>IV119/B_st12h</kod>
+<nazev>Seminar on Discrete Mathematical Methods</nazev>
+<predmetid>1323768</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<akce>
+<kod>PB152cv</kod>
+<nazev>Operační systémy - cvičení</nazev>
+<predmetid>1323841</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<akce>
+<kod>PB152cv/03</kod>
+<nazev>Operační systémy - cvičení</nazev>
+<predmetid>1323841</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+<akce>
+<kod>VB001</kod>
+<nazev>English Exam</nazev>
+<predmetid>1323945</predmetid>
+<fakulta_url>fi</fakulta_url>
+<obdobi_url>jaro2021</obdobi_url>
+</akce>
+</nezname>
+</rozvrh>
