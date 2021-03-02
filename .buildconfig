@@ -10,6 +10,12 @@
             }],
         "vichss": [{"path": "vichss/vichss.py", "newname": "chss"}],
         "viencode": [{"path": "viencode/viencode.py"}],
-        "viminidb": [{"path": "viminidb/viminidb.py"}]
+        "viminidb": [
+            {"path": "viminidb/viminidb.py"},
+            {"path": "viminidb/viminidb.py", "newname": "vidb"}
+        ],
+        "visym": [
+            {"path": "visym/visym.py"}
+        ]
     }
 }

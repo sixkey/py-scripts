@@ -872,19 +872,28 @@ def list_files(storage_path: str) -> List[str]:
 
     return res
 
+def get_script_path() -> str:
+    res = ""
+    # determine if application is a script file or frozen exe
+    if getattr(sys, 'frozen', False):
+        res = os.path.abspath(os.path.dirname(sys.executable))
+    elif __file__:
+        res = os.path.abspath(os.path.dirname(__file__))
+    return res
+
 
 def get_local_storage() -> str:
-    return os.path.dirname(os.path.realpath(sys.argv[0])) + "\\.viminidbstorage"
+    return os.path.join(get_script_path(),".viminidbstorage")
 
 
 def get_db_storage(filename: str = None) -> str:
-    addition = "" if filename is None else "\\" + filename
-    return get_local_storage() + "\\tables" + addition
+    addition = "" if filename is None else filename
+    return os.path.join(get_local_storage(), "tables", addition)
 
 
 def get_scripts_storage(filename: str = None) -> str:
-    addition = "" if filename is None else "\\" + filename
-    return get_local_storage() + "\\scripts" + addition
+    addition = "" if filename is None else filename
+    return os.path.join(get_local_storage(), "scripts", addition)
 
 
 def get_def_value(def_value: str, table_context: Table):
@@ -910,7 +919,7 @@ def create_table_factory(name: str, cols: List[Column]) -> TableAction:
 
 def load_table_factory(storage_path: str, table_name: str) -> TableAction:
     def load(table: Table) -> Table:
-        new_table = load_table_from(storage_path + "\\" + table_name + ".tbl")
+        new_table = load_table_from(os.path.join(storage_path, table_name + ".tbl"))
         return new_table
     return load
 
@@ -919,7 +928,7 @@ def save_table_factory(storage_path: str, table_name: str = None) -> TableAction
     def save(table: Table) -> Table:
         if table:
             file_name = (table_name if table_name else table.name) + ".tbl"
-            file_path = storage_path + "\\" + file_name
+            file_path = os.path.join(storage_path, file_name)
             write_table_to(table, file_path)
         return table
     return save
@@ -929,7 +938,7 @@ def drop_table_factory(storage_path: str, table_name: str = None) -> TableAction
     def drop(table: Table):
         if table:
             file_name = (table_name if table_name else table.name) + ".tbl"
-            file_path = storage_path + "\\" + file_name
+            file_path = os.path.join(storage_path, file_name)
             delete_table(file_path)
         return None
     return drop
@@ -1816,7 +1825,7 @@ def execute_query(query: str, query_args: List[str], type: bool,
         function = tree.get()[2]
 
         if load:
-            if os.path.exists(storage_path + "\\current.tbl"):
+            if os.path.exists(os.path.join(storage_path, "current.tbl")):
                 load_current = load_table_factory(storage_path, "current")
                 function = dot(function, load_current)
         if save:

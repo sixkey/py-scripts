@@ -17,7 +17,7 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
 
     script_path = os.path.dirname(os.path.realpath(sys.argv[0]))
-    config_path = script_path + '\\.buildconfig'
+    config_path = os.path.join(script_path, ".buildconfig")
 
     profiles = None
     with open(config_path, "r") as f:
